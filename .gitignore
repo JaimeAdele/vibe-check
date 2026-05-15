@@ -1,0 +1,23 @@
+# Dependencies — never commit these
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Build output
+frontend/dist/
+backend/dist/
+
+# Environment files — contain secrets, never commit
+.env
+backend/.env
+
+# Product specs and learning notes — reference docs, not code
+SetlistLive_*.md
+learning/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
