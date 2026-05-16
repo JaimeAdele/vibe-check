@@ -1,30 +1,32 @@
-import { useState, useEffect } from 'react';
-import NowPlayingCard from './components/NowPlayingCard';
+import { useState } from 'react';
+import CreateRoomForm from './components/CreateRoomForm';
 
-interface Song {
+interface Room {
   id: string;
-  title: string;
-  artist: string;
-  identifiedAt: string;
+  name: string;
+  roomCode: string;
 }
 
 function App() {
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rooms, setRooms] = useState<Room[]>([]);
 
-  useEffect(() => {
-    fetch('/api/events/test-room/setlist')
-      .then(res => res.json())
-      .then(data => {
-        setSongs(data.songs);
-        setLoading(false);
-      });
-  }, []);
+  function handleRoomCreated(room: Room) {
+    setRooms(prev => [...prev, room]);
+  }
 
-  if (loading) return <p>Loading...</p>;
-  if (songs.length === 0) return <p>No songs found.</p>;
-
-  return <NowPlayingCard song={songs[0]} />;
+  return (
+    <div>
+      <h1>Setlist Live - Admin</h1>
+      <CreateRoomForm onRoomCreated={handleRoomCreated} />
+      <ul>
+        {rooms.map((room) => (
+          <li key={room.id}>
+            {room.name} — code: <strong>{room.roomCode}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default App;
