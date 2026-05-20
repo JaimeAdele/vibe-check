@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import passport from './lib/passport';
 import eventsRouter from './routes/events';
 import authRouter from './routes/auth';
+import identifyRouter from './routes/identify';
 
 const app = express();
 
@@ -23,5 +24,6 @@ app.get('/api/health', (_req, res) => {
 // Mount the events router at /api/events
 app.use('/api/auth', authRouter);
 app.use('/api/events', eventsRouter);
+app.use('/api/events/:id/identify', identifyRouter);
 
 export default app;
