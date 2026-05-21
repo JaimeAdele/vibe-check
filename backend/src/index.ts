@@ -12,6 +12,7 @@ io.on('connection', (socket) => {
   socket.on('join:room', (roomCode: string) => {
     socket.join(roomCode);
   });
+
 });
 
 httpServer.listen(PORT, () => {

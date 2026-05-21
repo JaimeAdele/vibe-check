@@ -11,21 +11,32 @@ interface Song {
 
 interface Props {
   eventId: string;
+  roomLocked: boolean;
 }
 
 const ACTIVE_STATES: IdentifyState[] = ['listening', 'processing'];
 
-function IdentifyButton({ eventId }: Props) {
+function IdentifyButton({ eventId, roomLocked }: Props) {
   const [state, setState] = useState<IdentifyState>('idle');
   const [match, setMatch] = useState<Song | null>(null);
   const { capture } = useAudioCapture();
 
   async function handleClick() {
-    if (ACTIVE_STATES.includes(state)) return;
-
-    setState('listening');
+    if (ACTIVE_STATES.includes(state) || roomLocked) return;
 
     try {
+      const reserveRes = await fetch(`/api/events/${eventId}/identify/reserve`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!reserveRes.ok) {
+        setState('error');
+        setTimeout(() => setState('idle'), 3000);
+        return;
+      }
+
+      setState('listening');
       const blob = await capture(8000);
       setState('processing');
 
@@ -46,9 +57,6 @@ function IdentifyButton({ eventId }: Props) {
       } else if (res.status === 422) {
         setState('no_match');
         setTimeout(() => setState('idle'), 3000);
-      } else if (res.status === 409) {
-        setState('error');
-        setTimeout(() => setState('idle'), 3000);
       } else {
         setState('error');
         setTimeout(() => setState('idle'), 3000);
@@ -60,7 +68,7 @@ function IdentifyButton({ eventId }: Props) {
   }
 
   const label: Record<IdentifyState, string> = {
-    idle: 'Identify Song',
+    idle: roomLocked ? 'Identifying...' : 'Identify Song',
     listening: 'Listening...',
     processing: 'Identifying...',
     match: match ? `${match.title} — ${match.artist}` : 'Match found',
@@ -68,7 +76,7 @@ function IdentifyButton({ eventId }: Props) {
     error: 'Something went wrong',
   };
 
-  const disabled = ACTIVE_STATES.includes(state);
+  const disabled = ACTIVE_STATES.includes(state) || roomLocked;
 
   return (
     <button onClick={handleClick} disabled={disabled}>

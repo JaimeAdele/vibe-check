@@ -31,7 +31,7 @@ function RoomView({ room, onBack }: Props) {
       .then((data) => setSongs(data.songs));
   }, [room.id]);
 
-  useRoomSocket(room.roomCode, (song) => {
+  const { isIdentifying } = useRoomSocket(room.roomCode, (song) => {
     setSongs((prev) => [song, ...prev]);
   });
 
@@ -53,7 +53,7 @@ function RoomView({ room, onBack }: Props) {
         {room.name} — {room.roomCode}
       </h2>
 
-      <IdentifyButton eventId={room.id} />
+      <IdentifyButton eventId={room.id} roomLocked={isIdentifying} />
 
       <form onSubmit={handleAddSong}>
         <input
