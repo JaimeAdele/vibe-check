@@ -22,6 +22,9 @@ model Song {
   eventId      String
   title        String
   artist       String
+  albumArt     String?
+  previewUrl   String?
+  spotifyId    String?
   identifiedAt DateTime @default(now())
   event        Event    @relation(fields: [eventId], references: [id])
 }

@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import redis from '../lib/redis';
 import { getIO } from '../lib/socket';
 import { identifyAudio } from '../services/acr';
+import { searchTrack } from '../services/spotify';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router({ mergeParams: true });
@@ -56,8 +57,17 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
       return;
     }
 
+    const spotify = await searchTrack(result.title, result.artist).catch(() => null);
+
     const song = await prisma.song.create({
-      data: { title: result.title, artist: result.artist, eventId },
+      data: {
+        title: result.title,
+        artist: result.artist,
+        eventId,
+        albumArt: spotify?.albumArt ?? null,
+        previewUrl: spotify?.previewUrl ?? null,
+        spotifyId: spotify?.spotifyId ?? null,
+      },
     });
 
     getIO().to(event.roomCode).emit('song:added', song);

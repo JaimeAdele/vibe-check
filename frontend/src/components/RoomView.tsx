@@ -6,6 +6,8 @@ interface Song {
   id: string;
   title: string;
   artist: string;
+  albumArt: string | null;
+  spotifyId: string | null;
   identifiedAt: string;
 }
 
@@ -72,7 +74,15 @@ function RoomView({ room, onBack }: Props) {
       <ul>
         {songs.map((song) => (
           <li key={song.id}>
+            {song.albumArt && (
+              <img src={song.albumArt} alt={song.title} width={48} height={48} />
+            )}
             {song.title} — {song.artist}
+            {song.spotifyId && (
+              <a href={`https://open.spotify.com/track/${song.spotifyId}`} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>
+                Open in Spotify
+              </a>
+            )}
           </li>
         ))}
       </ul>
