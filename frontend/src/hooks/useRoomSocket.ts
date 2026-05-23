@@ -13,7 +13,8 @@ interface Song {
 export function useRoomSocket(
   roomCode: string,
   onSongAdded: (song: Song) => void,
-  onSongRemoved: (songId: string) => void
+  onSongRemoved: (songId: string) => void,
+  onStatusChanged: (status: string) => void
 ) {
   const [isIdentifying, setIsIdentifying] = useState(false);
 
@@ -23,6 +24,9 @@ export function useRoomSocket(
     socket.on('song:added', onSongAdded);
     socket.on('song:removed', ({ songId }: { songId: string }) => {
       onSongRemoved(songId);
+    });
+    socket.on('event:status', ({ status }: { status: string }) => {
+      onStatusChanged(status);
     });
     let lockTimeout: ReturnType<typeof setTimeout>;
     socket.on('identify:start', () => {
@@ -37,6 +41,7 @@ export function useRoomSocket(
     return () => {
       socket.off('song:added', onSongAdded);
       socket.off('song:removed', onSongRemoved);
+      socket.off('event:status');
       socket.off('identify:start');
       socket.off('identify:end');
     };

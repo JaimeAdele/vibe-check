@@ -7,6 +7,18 @@ interface Room {
   id: string;
   name: string;
   roomCode: string;
+  status: 'UPCOMING' | 'ACTIVE' | 'CLOSED';
+  startTime: string;
+  createdAt: string;
+}
+
+function formatStartTime(iso: string) {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
+    ' · ' +
+    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  );
 }
 
 function App() {
@@ -25,6 +37,10 @@ function App() {
 
   function handleRoomCreated(room: Room) {
     setRooms(prev => [...prev, room]);
+  }
+
+  function handleRoomUpdate(roomId: string, updates: Partial<Pick<Room, 'status' | 'startTime'>>) {
+    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...updates } : r));
   }
 
   async function handleRemoveEvent(roomId: string) {
@@ -49,12 +65,49 @@ function App() {
   }
 
   if (activeRoom) {
-    return <RoomView room={activeRoom} onBack={() => setActiveRoom(null)} isPrivileged={isPrivileged} />;
+    return <RoomView room={activeRoom} onBack={() => setActiveRoom(null)} isPrivileged={isPrivileged} onRoomUpdate={handleRoomUpdate} />;
   }
+
+  const byTime = (a: Room, b: Room) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  const activeRooms = rooms.filter(r => r.status === 'ACTIVE').sort(byTime);
+  const upcomingRooms = rooms.filter(r => r.status === 'UPCOMING').sort(byTime);
+  const closedRooms = rooms.filter(r => r.status === 'CLOSED').sort((a, b) => -byTime(a, b));
+
+  const renderRoomList = (sectionRooms: Room[]) => (
+    <ul className='flex flex-col gap-3'>
+      {sectionRooms.map((room) => (
+        <li key={room.id} className='flex items-stretch gap-2'>
+          <button
+            onClick={() => setActiveRoom(room)}
+            className='flex-1 flex items-center justify-between bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-4 transition-colors cursor-pointer'
+          >
+            <div className='text-left'>
+              <p className='text-white font-medium'>{room.name}</p>
+              <p className='text-gray-500 text-xs mt-0.5'>{formatStartTime(room.startTime)}</p>
+            </div>
+            <span className='text-xs font-mono bg-gray-800 text-accent px-3 py-1 rounded-full shrink-0 ml-3'>
+              {room.roomCode}
+            </span>
+          </button>
+          {isPrivileged && (
+            <button
+              onClick={() => handleRemoveEvent(room.id)}
+              className='self-stretch w-14 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer'
+              aria-label='Delete event'
+            >
+              <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+                <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
+              </svg>
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <div className='min-h-screen bg-gray-950 flex flex-col items-center py-8 sm:py-12'>
-      <div className='max-w-lg'>
+      <div className='w-full max-w-lg px-4'>
         <h1 className='text-4xl font-bold text-white tracking-tight mb-1'>
           Vibe Check
         </h1>
@@ -109,36 +162,25 @@ function App() {
         <CreateRoomForm onRoomCreated={handleRoomCreated} />
 
         {rooms.length > 0 && (
-          <div className='mt-10'>
-            <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4'>
-              Your Rooms
-            </h2>
-            <ul className='flex flex-col gap-3'>
-              {rooms.map((room) => (
-                <li key={room.id} className='flex items-stretch gap-2'>
-                  <button
-                    onClick={() => setActiveRoom(room)}
-                    className='flex-1 flex items-center justify-between bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-4 transition-colors cursor-pointer'
-                  >
-                    <span className='text-white font-medium'>{room.name}</span>
-                    <span className='text-xs font-mono bg-gray-800 text-accent px-3 py-1 rounded-full'>
-                      {room.roomCode}
-                    </span>
-                  </button>
-                  {isPrivileged && (
-                    <button
-                      onClick={() => handleRemoveEvent(room.id)}
-                      className='self-stretch w-14 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer'
-                      aria-label='Delete event'
-                    >
-                      <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
-                        <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
-                      </svg>
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+          <div className='mt-10 flex flex-col gap-8'>
+            {activeRooms.length > 0 && (
+              <div>
+                <h2 className='text-xs font-semibold uppercase tracking-widest text-green-400 mb-4'>Active</h2>
+                {renderRoomList(activeRooms)}
+              </div>
+            )}
+            {upcomingRooms.length > 0 && (
+              <div>
+                <h2 className='text-xs font-semibold uppercase tracking-widest text-blue-400 mb-4'>Upcoming</h2>
+                {renderRoomList(upcomingRooms)}
+              </div>
+            )}
+            {closedRooms.length > 0 && (
+              <div>
+                <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4'>Closed</h2>
+                {renderRoomList(closedRooms)}
+              </div>
+            )}
           </div>
         )}
       </div>

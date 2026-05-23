@@ -23,10 +23,14 @@ router.get('/', async (_req, res) => {
 
 // POST /api/events - create a new room
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
-  const { name } = req.body;
+  const { name, startTime } = req.body;
 
   if (!name || typeof name !== 'string') {
     res.status(400).json({ error: 'name is required' });
+    return;
+  }
+  if (!startTime) {
+    res.status(400).json({ error: 'startTime is required' });
     return;
   }
 
@@ -35,6 +39,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       data: {
         name,
         roomCode: generateRoomCode(),
+        startTime: new Date(startTime),
       },
     });
     res.status(201).json(event);
@@ -81,6 +86,11 @@ router.post('/:id/songs', requireAuth, requirePrivileged, async (req, res) => {
       return;
     }
 
+    if (event.status !== 'ACTIVE') {
+      res.status(403).json({ error: 'Event is not active' });
+      return;
+    }
+
     const song = await prisma.song.create({
       data: { title, artist, eventId: req.params.id },
     });
@@ -90,6 +100,47 @@ router.post('/:id/songs', requireAuth, requirePrivileged, async (req, res) => {
     res.status(201).json(song);
   } catch {
     res.status(500).json({ error: 'Failed to add song' });
+  }
+});
+
+// PATCH /api/events/:id/status - update event status
+router.patch('/:id/status', requireAuth, requireAdmin, async (req, res) => {
+  const { status } = req.body;
+
+  if (!['UPCOMING', 'ACTIVE', 'CLOSED'].includes(status)) {
+    res.status(400).json({ error: 'Invalid status' });
+    return;
+  }
+
+  try {
+    const event = await prisma.event.update({
+      where: { id: req.params.id },
+      data: { status },
+    });
+    getIO().to(event.roomCode).emit('event:status', { status: event.status });
+    res.json(event);
+  } catch {
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// PATCH /api/events/:id/startTime - update event start time
+router.patch('/:id/startTime', requireAuth, requireAdmin, async (req, res) => {
+  const { startTime } = req.body;
+
+  if (!startTime) {
+    res.status(400).json({ error: 'startTime is required' });
+    return;
+  }
+
+  try {
+    const event = await prisma.event.update({
+      where: { id: req.params.id },
+      data: { startTime: new Date(startTime) },
+    });
+    res.json(event);
+  } catch {
+    res.status(500).json({ error: 'Failed to update start time' });
   }
 });
 

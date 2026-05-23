@@ -12,7 +12,8 @@ model Event {
   id        String      @id @default(uuid())
   name      String
   roomCode  String      @unique
-  status    EventStatus @default(DRAFT)
+  status    EventStatus @default(UPCOMING)
+  startTime DateTime
   createdAt DateTime    @default(now())
   songs     Song[]
 }
@@ -30,9 +31,8 @@ model Song {
 }
 
 enum EventStatus {
-  DRAFT
-  LIVE
-  PAUSED
+  UPCOMING
+  ACTIVE
   CLOSED
 }
 

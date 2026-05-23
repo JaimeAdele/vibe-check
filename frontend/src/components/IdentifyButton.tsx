@@ -12,11 +12,12 @@ interface Song {
 interface Props {
   eventId: string;
   roomLocked: boolean;
+  eventActive: boolean;
 }
 
 const ACTIVE_STATES: IdentifyState[] = ['listening', 'processing'];
 
-function IdentifyButton({ eventId, roomLocked }: Props) {
+function IdentifyButton({ eventId, roomLocked, eventActive }: Props) {
   const [state, setState] = useState<IdentifyState>('idle');
   const [match, setMatch] = useState<Song | null>(null);
   const { capture } = useAudioCapture();
@@ -67,12 +68,12 @@ function IdentifyButton({ eventId, roomLocked }: Props) {
     }
   }
 
-  const isActive = ACTIVE_STATES.includes(state) || roomLocked;
+  const isActive = ACTIVE_STATES.includes(state) || roomLocked || !eventActive;
 
   const config: Record<IdentifyState, { label: string; style: string }> = {
     idle: {
-      label: roomLocked ? 'Identifying...' : 'Identify Song',
-      style: 'bg-accent hover:bg-accent-hover text-black',
+      label: !eventActive ? 'Event not active' : roomLocked ? 'Identifying...' : 'Identify Song',
+      style: !eventActive ? 'bg-gray-800 text-gray-500' : 'bg-accent hover:bg-accent-hover text-black',
     },
     listening: {
       label: 'Listening...',

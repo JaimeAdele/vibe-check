@@ -15,18 +15,42 @@ interface Room {
   id: string;
   name: string;
   roomCode: string;
+  status: 'UPCOMING' | 'ACTIVE' | 'CLOSED';
+  startTime: string;
+  createdAt: string;
 }
 
 interface Props {
   room: Room;
   onBack: () => void;
   isPrivileged: boolean;
+  onRoomUpdate: (roomId: string, updates: Partial<Pick<Room, 'status' | 'startTime'>>) => void;
 }
 
-function RoomView({ room, onBack, isPrivileged }: Props) {
+function formatStartTime(iso: string) {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
+    ' · ' +
+    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  );
+}
+
+function toInputValue(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function RoomView({ room, onBack, isPrivileged, onRoomUpdate }: Props) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
+  const [status, setStatus] = useState(room.status);
+  const [startTime, setStartTime] = useState(room.startTime);
+  const [editingStartTime, setEditingStartTime] = useState(false);
+  const [startTimeInput, setStartTimeInput] = useState(toInputValue(room.startTime));
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/events/${room.id}/setlist`)
@@ -37,7 +61,10 @@ function RoomView({ room, onBack, isPrivileged }: Props) {
   const { isIdentifying } = useRoomSocket(room.roomCode, (song) => {
     setSongs((prev) => [song, ...prev]);
   }, (songId) => {
-    setSongs((prev) => prev.filter((s) => s.id !== songId))
+    setSongs((prev) => prev.filter((s) => s.id !== songId));
+  }, (newStatus) => {
+    setStatus(newStatus as Room['status']);
+    onRoomUpdate(room.id, { status: newStatus as Room['status'] });
   });
 
   function handleAddSong(e: React.SubmitEvent) {
@@ -49,6 +76,35 @@ function RoomView({ room, onBack, isPrivileged }: Props) {
     });
     setTitle('');
     setArtist('');
+  }
+
+  async function handleStatusChange(newStatus: string) {
+    const res = await fetch(`/api/events/${room.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+      credentials: 'include',
+    });
+    if (res.ok) {
+      setStatus(newStatus as Room['status']);
+      onRoomUpdate(room.id, { status: newStatus as Room['status'] });
+    }
+  }
+
+  async function handleSaveStartTime() {
+    const res = await fetch(`/api/events/${room.id}/startTime`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startTime: new Date(startTimeInput).toISOString() }),
+      credentials: 'include',
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setStartTime(updated.startTime);
+      setStartTimeInput(toInputValue(updated.startTime));
+      setEditingStartTime(false);
+      onRoomUpdate(room.id, { startTime: updated.startTime });
+    }
   }
 
   function handleRemoveSong(songId: string) {
@@ -66,20 +122,84 @@ function RoomView({ room, onBack, isPrivileged }: Props) {
         <div className='flex items-center gap-4 mb-8'>
           <button
             onClick={onBack}
-            className='text-gray-400 hover:text-white transition-colors text-sm cursor-pointer'
+            className='text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-xl transition-colors text-sm cursor-pointer shrink-0'
           >
             ← Back
           </button>
-          <div>
-            <h1 className='text-2xl font-bold text-white'>{room.name}</h1>
-            <span className='text-xs font-mono text-accent'>
-              {room.roomCode}
-            </span>
+          <div className='flex-1'>
+            <div className='mb-0.5'>
+              <div className='flex items-center gap-2 flex-wrap mb-1'>
+                {isPrivileged && statusDropdownOpen ? (
+                  (['UPCOMING', 'ACTIVE', 'CLOSED'] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => { handleStatusChange(s); setStatusDropdownOpen(false); }}
+                      className={`text-xs font-medium px-2 py-1 rounded-full transition-colors cursor-pointer ${
+                        status === s
+                          ? s === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
+                            s === 'CLOSED' ? 'bg-gray-700 text-gray-400' :
+                            'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-800 text-gray-500 hover:text-white'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))
+                ) : isPrivileged ? (
+                  <button
+                    onClick={() => setStatusDropdownOpen(true)}
+                    className={`text-xs font-medium px-2 py-1 rounded-full transition-colors cursor-pointer ${
+                      status === 'ACTIVE' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' :
+                      status === 'CLOSED' ? 'bg-gray-700 text-gray-400 hover:bg-gray-600' :
+                      'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ) : (
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
+                    status === 'CLOSED' ? 'bg-gray-700 text-gray-400' :
+                    'bg-blue-500/20 text-blue-400'
+                  }`}>
+                    {status}
+                  </span>
+                )}
+              </div>
+              <h1 className='text-2xl font-bold text-white'>{room.name}</h1>
+            </div>
+
+            <span className='text-xs font-mono text-accent'>{room.roomCode}</span>
+
+            {editingStartTime ? (
+              <div className='flex items-center gap-2 mt-2'>
+                <input
+                  type='datetime-local'
+                  value={startTimeInput}
+                  onChange={(e) => setStartTimeInput(e.target.value)}
+                  className='bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:border-accent'
+                />
+                <button onClick={handleSaveStartTime} className='text-sm text-accent hover:text-accent-hover transition-colors cursor-pointer'>Save</button>
+                <button onClick={() => setEditingStartTime(false)} className='text-sm text-gray-500 hover:text-white transition-colors cursor-pointer'>Cancel</button>
+              </div>
+            ) : (
+              <div className='flex items-center gap-2 mt-1'>
+                <span className='text-sm text-gray-400'>{formatStartTime(startTime)}</span>
+                {isPrivileged && (
+                  <button
+                    onClick={() => setEditingStartTime(true)}
+                    className='text-sm text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded-lg transition-colors cursor-pointer'
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Identify button */}
-        <IdentifyButton eventId={room.id} roomLocked={isIdentifying} />
+        <IdentifyButton eventId={room.id} roomLocked={isIdentifying} eventActive={status === 'ACTIVE'} />
 
         {/* Manual add song form */}
         <form onSubmit={handleAddSong} className='flex flex-col gap-2 mt-4 sm:flex-row sm:gap-3'>
