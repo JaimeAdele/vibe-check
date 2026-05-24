@@ -1,7 +1,13 @@
+function getSupportedMimeType(): string {
+  const candidates = ['audio/webm', 'audio/mp4', 'audio/ogg'];
+  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+}
+
 export function useAudioCapture() {
   async function capture(durationMs: number): Promise<Blob> {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    const mimeType = getSupportedMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
 
     return new Promise((resolve, reject) => {
@@ -10,7 +16,7 @@ export function useAudioCapture() {
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        resolve(new Blob(chunks, { type: 'audio/webm' }));
+        resolve(new Blob(chunks, { type: mimeType || 'audio/webm' }));
       };
       recorder.onerror = () => {
         stream.getTracks().forEach((t) => t.stop());

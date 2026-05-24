@@ -57,7 +57,28 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
       return;
     }
 
+    const mostRecent = await prisma.song.findFirst({
+      where: { eventId },
+      orderBy: { identifiedAt: 'desc' },
+    });
+
+    const isDuplicate =
+      mostRecent &&
+      mostRecent.title.toLowerCase() === result.title.toLowerCase() &&
+      mostRecent.artist.toLowerCase() === result.artist.toLowerCase();
+
     const spotify = await searchTrack(result.title, result.artist).catch(() => null);
+
+    if (isDuplicate) {
+      res.status(200).json({
+        title: result.title,
+        artist: result.artist,
+        albumArt: spotify?.albumArt ?? null,
+        spotifyId: spotify?.spotifyId ?? null,
+        duplicate: true,
+      });
+      return;
+    }
 
     const song = await prisma.song.create({
       data: {

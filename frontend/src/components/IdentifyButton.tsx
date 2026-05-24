@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useAudioCapture } from '../hooks/useAudioCapture';
 
-type IdentifyState = 'idle' | 'listening' | 'processing' | 'match' | 'no_match' | 'error';
+type IdentifyState = 'idle' | 'listening' | 'processing' | 'match' | 'duplicate' | 'no_match' | 'error';
 
 interface Song {
-  id: string;
   title: string;
   artist: string;
+  duplicate?: boolean;
 }
 
 interface Props {
@@ -53,7 +53,7 @@ function IdentifyButton({ eventId, roomLocked, eventActive }: Props) {
       if (res.ok) {
         const song: Song = await res.json();
         setMatch(song);
-        setState('match');
+        setState(song.duplicate ? 'duplicate' : 'match');
         setTimeout(() => setState('idle'), 5000);
       } else if (res.status === 422) {
         setState('no_match');
@@ -86,6 +86,10 @@ function IdentifyButton({ eventId, roomLocked, eventActive }: Props) {
     match: {
       label: match ? `${match.title} — ${match.artist}` : 'Match found',
       style: 'bg-gray-800 text-accent',
+    },
+    duplicate: {
+      label: match ? `Already playing — ${match.title}` : 'Already on the list',
+      style: 'bg-gray-800 text-yellow-400',
     },
     no_match: {
       label: 'No match found',

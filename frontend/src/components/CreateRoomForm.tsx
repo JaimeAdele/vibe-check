@@ -37,7 +37,7 @@ function CreateRoomForm({ onRoomCreated }: CreateRoomFormProps) {
 
   const startTimeIsValid = startTime && new Date(startTime) > new Date();
 
-  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.SubmitEvent) {
     e.preventDefault();
     setLoading(true);
 
