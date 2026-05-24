@@ -159,7 +159,7 @@ function App() {
           </form>
         )}
 
-        <CreateRoomForm onRoomCreated={handleRoomCreated} />
+        {user?.role === 'ADMIN' && <CreateRoomForm onRoomCreated={handleRoomCreated} />}
 
         {rooms.length > 0 && (
           <div className='mt-10 flex flex-col gap-8'>
