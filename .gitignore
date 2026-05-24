@@ -15,6 +15,9 @@ backend/.env
 SetlistLive_*.md
 learning/
 
+# Screenshots — local reference only
+screenshots/
+
 # macOS
 .DS_Store
 
