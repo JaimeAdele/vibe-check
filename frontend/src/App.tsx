@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCurrentUser } from './hooks/useCurrentUser';
 import CreateRoomForm from './components/CreateRoomForm';
 import RoomView from './components/RoomView';
+import AdminVenuesPage from './components/AdminVenuesPage';
 
 interface Room {
   id: string;
@@ -33,6 +34,7 @@ function App() {
   const [pendingRoom, setPendingRoom] = useState<Room | null>(null);
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState(false);
+  const [showVenueManager, setShowVenueManager] = useState(false);
   const { user, isPrivileged, login, logout } = useCurrentUser();
 
   useEffect(() => {
@@ -100,6 +102,10 @@ function App() {
     return <RoomView room={activeRoom} onBack={() => setActiveRoom(null)} isPrivileged={isPrivileged} onRoomUpdate={handleRoomUpdate} />;
   }
 
+  if (showVenueManager) {
+    return <AdminVenuesPage onBack={() => setShowVenueManager(false)} />;
+  }
+
   const byTime = (a: Room, b: Room) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
   const activeRooms = rooms.filter(r => r.status === 'ACTIVE').sort(byTime);
   const upcomingRooms = rooms.filter(r => r.status === 'UPCOMING').sort(byTime);
@@ -157,6 +163,14 @@ function App() {
                 <span className='text-gray-400'>
                   <span className='text-accent'>{user.role}</span>
                 </span>
+                {user.role === 'ADMIN' && (
+                  <button
+                    onClick={() => setShowVenueManager(true)}
+                    className='text-gray-500 hover:text-white transition-colors cursor-pointer'
+                  >
+                    Venues
+                  </button>
+                )}
                 <button
                   onClick={logout}
                   className='text-gray-500 hover:text-white transition-colors cursor-pointer'

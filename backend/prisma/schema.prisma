@@ -15,6 +15,7 @@ model Venue {
   lat             Float
   lng             Float
   geoFenceRadius  Int     @default(150)
+  isActive        Boolean @default(true)
   events          Event[]
 }
 

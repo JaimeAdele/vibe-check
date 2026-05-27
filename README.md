@@ -12,6 +12,7 @@ A real-time DJ set song identification platform. Attendees at a live event can i
 - 🔒 **Role-based access** — Google OAuth login; DJs and admins can remove songs, delete events, and export Spotify playlists
 - 🔁 **Duplicate detection** — if the same song is identified twice in a row, it is skipped and the user sees an "Already playing" message instead of a duplicate entry
 - 📍 **Venues & geofencing** — events can be linked to a venue; regular users must be within the venue's geofence radius to identify songs (checked on every tap, not just room entry)
+- 🏟️ **Venue management** — admins can edit any venue's name, address, coordinates, and geofence radius; deleting a venue soft-deletes it (the row stays in the database so linked events are unaffected) and removes it from the event-creation dropdown; deleted venues can be restored
 
 ---
 
@@ -176,8 +177,12 @@ All routes are prefixed with `/api`.
 | `POST` | `/events/:id/identify/reserve` | Acquire identification lock |
 | `POST` | `/events/:id/identify` | Submit audio for identification |
 | `GET` | `/spotify/search?q=...` | Search Spotify for tracks (DJ/admin only) |
-| `GET` | `/venues` | List all venues (admin) |
+| `GET` | `/venues` | List active venues (used by event-creation dropdown) |
+| `GET` | `/venues/all` | List all venues including inactive ones (admin) |
 | `POST` | `/venues` | Create a venue with lat/lng and geofence radius (admin) |
+| `PATCH` | `/venues/:id` | Edit a venue's name, address, coordinates, or radius (admin) |
+| `DELETE` | `/venues/:id` | Soft-delete a venue — sets isActive: false (admin) |
+| `PATCH` | `/venues/:id/restore` | Restore a soft-deleted venue (admin) |
 | `POST` | `/venues/validate-location/:eventId` | Check if coordinates are within the event's venue geofence |
 | `PATCH` | `/events/:id/status` | Update event status (admin) |
 | `PATCH` | `/events/:id/startTime` | Update event start time (admin) |

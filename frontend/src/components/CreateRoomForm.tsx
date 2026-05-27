@@ -272,17 +272,27 @@ function CreateRoomForm({ onRoomCreated }: CreateRoomFormProps) {
       </div>
 
       {/* Venue selector */}
-      <select
-        value={showNewVenueForm ? 'new' : selectedVenueId}
-        onChange={e => handleVenueDropdownChange(e.target.value)}
-        className='w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors text-base sm:text-sm'
-      >
-        <option value=''>No venue</option>
-        {venues.map(v => (
-          <option key={v.id} value={v.id}>{v.name}</option>
-        ))}
-        <option value='new'>+ Add new venue...</option>
-      </select>
+      <div className='relative'>
+        <select
+          value={showNewVenueForm ? 'new' : selectedVenueId}
+          onChange={e => handleVenueDropdownChange(e.target.value)}
+          className='w-full appearance-none bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors text-base sm:text-sm'
+        >
+          <option value=''>No venue</option>
+          {venues.map(v => (
+            <option key={v.id} value={v.id}>{v.name}</option>
+          ))}
+          <option value='new'>+ Add new venue...</option>
+        </select>
+        <svg
+          className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'
+          width='16' height='16' viewBox='0 0 24 24'
+          fill='none' stroke='currentColor' strokeWidth='2.5'
+          strokeLinecap='round' strokeLinejoin='round'
+        >
+          <polyline points='6 9 12 15 18 9' />
+        </svg>
+      </div>
 
       {/* Inline new venue form */}
       {showNewVenueForm && (
