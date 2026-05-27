@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCurrentUser } from './hooks/useCurrentUser';
 import CreateRoomForm from './components/CreateRoomForm';
 import RoomView from './components/RoomView';
+import AdminVenuesPage from './components/AdminVenuesPage';
 
 interface Room {
   id: string;
@@ -10,6 +11,8 @@ interface Room {
   status: 'UPCOMING' | 'ACTIVE' | 'CLOSED';
   startTime: string;
   createdAt: string;
+  venueId: string | null;
+  venue: { id: string; name: string; address: string | null } | null;
 }
 
 function formatStartTime(iso: string) {
@@ -29,6 +32,10 @@ function App() {
   const [loginError, setLoginError] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [pendingRoom, setPendingRoom] = useState<Room | null>(null);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState(false);
+  const [showVenueManager, setShowVenueManager] = useState(false);
   const { user, isPrivileged, login, logout } = useCurrentUser();
 
   useEffect(() => {
@@ -54,6 +61,31 @@ function App() {
     if (res.ok) setRooms(prev => prev.filter(r => r.id !== roomId));
   }
 
+  function handleRoomClick(room: Room) {
+    // Privileged users always enter directly
+    if (isPrivileged) { setActiveRoom(room); return; }
+    // Closed events — anyone can view the setlist, nothing to interact with anyway
+    if (room.status === 'CLOSED') { setActiveRoom(room); return; }
+    // Upcoming events — nothing to see yet, block regular users
+    if (room.status === 'UPCOMING') return;
+    // Active + venue → enter directly, geofence is checked per-interaction inside RoomView
+    if (room.venueId) { setActiveRoom(room); return; }
+    // Active + no venue → require room code
+    setPendingRoom(room);
+    setCodeInput('');
+    setCodeError(false);
+  }
+
+  function handleCodeSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (codeInput.trim().toUpperCase() === pendingRoom?.roomCode) {
+      setActiveRoom(pendingRoom);
+      setPendingRoom(null);
+    } else {
+      setCodeError(true);
+    }
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const success = await login(email, password);
@@ -71,6 +103,10 @@ function App() {
     return <RoomView room={activeRoom} onBack={() => setActiveRoom(null)} isPrivileged={isPrivileged} onRoomUpdate={handleRoomUpdate} />;
   }
 
+  if (showVenueManager) {
+    return <AdminVenuesPage onBack={() => setShowVenueManager(false)} />;
+  }
+
   const byTime = (a: Room, b: Room) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
   const activeRooms = rooms.filter(r => r.status === 'ACTIVE').sort(byTime);
   const upcomingRooms = rooms.filter(r => r.status === 'UPCOMING').sort(byTime);
@@ -81,16 +117,18 @@ function App() {
       {sectionRooms.map((room) => (
         <li key={room.id} className='flex items-stretch gap-2'>
           <button
-            onClick={() => setActiveRoom(room)}
+            onClick={() => handleRoomClick(room)}
             className='flex-1 flex items-center justify-between bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-4 transition-colors cursor-pointer'
           >
             <div className='text-left'>
               <p className='text-white font-medium'>{room.name}</p>
               <p className='text-gray-500 text-xs mt-0.5'>{formatStartTime(room.startTime)}</p>
             </div>
-            <span className='text-xs font-mono bg-gray-800 text-accent px-3 py-1 rounded-full shrink-0 ml-3'>
-              {room.roomCode}
-            </span>
+            {isPrivileged && (
+              <span className='text-xs font-mono bg-gray-800 text-accent px-3 py-1 rounded-full shrink-0 ml-3'>
+                {room.roomCode}
+              </span>
+            )}
           </button>
           {isPrivileged && (
             <button
@@ -126,6 +164,14 @@ function App() {
                 <span className='text-gray-400'>
                   <span className='text-accent'>{user.role}</span>
                 </span>
+                {user.role === 'ADMIN' && (
+                  <button
+                    onClick={() => setShowVenueManager(true)}
+                    className='text-gray-500 hover:text-white transition-colors cursor-pointer'
+                  >
+                    Venues
+                  </button>
+                )}
                 <button
                   onClick={logout}
                   className='text-gray-500 hover:text-white transition-colors cursor-pointer'
@@ -216,6 +262,57 @@ function App() {
                   <p className='text-red-400 text-sm text-center'>
                     Invalid email or password
                   </p>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Room code entry modal */}
+        {pendingRoom && (
+          <div
+            className='fixed inset-0 z-50 flex items-center justify-center bg-black/60'
+            onClick={() => { setPendingRoom(null); setCodeError(false); }}
+          >
+            <div
+              className='bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm mx-4'
+              onClick={e => e.stopPropagation()}
+            >
+              <div className='flex items-center justify-between mb-5'>
+                <h2 className='text-white font-semibold text-lg'>Enter room code</h2>
+                <button
+                  onClick={() => { setPendingRoom(null); setCodeError(false); }}
+                  className='text-gray-500 hover:text-white transition-colors cursor-pointer'
+                  aria-label='Close'
+                >
+                  <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+                    <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
+                  </svg>
+                </button>
+              </div>
+              <p className='text-gray-400 text-sm mb-4'>
+                Enter the code displayed at <span className='text-white'>{pendingRoom.name}</span> to join.
+              </p>
+              <form onSubmit={handleCodeSubmit} className='flex flex-col gap-3'>
+                <input
+                  type='text'
+                  value={codeInput}
+                  onChange={e => { setCodeInput(e.target.value.toUpperCase()); setCodeError(false); }}
+                  placeholder='e.g. AB12XY'
+                  autoFocus
+                  autoCapitalize='characters'
+                  maxLength={6}
+                  className='w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 font-mono tracking-widest text-center text-lg focus:outline-none focus:border-accent transition-colors'
+                />
+                <button
+                  type='submit'
+                  disabled={codeInput.length < 6}
+                  className='w-full bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm cursor-pointer'
+                >
+                  Join room
+                </button>
+                {codeError && (
+                  <p className='text-red-400 text-sm text-center'>Incorrect code — try again</p>
                 )}
               </form>
             </div>
