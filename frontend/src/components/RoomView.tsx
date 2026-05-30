@@ -429,7 +429,11 @@ function RoomView({ room, onBack, isPrivileged, onRoomUpdate }: Props) {
             </p>
           ) : (
             <ul className='flex flex-col gap-7'>
-              {songs.map((song) => (
+              {songs.map((song) => {
+                const vibeAvg = song.reactionCount > 0
+                  ? song.vibeScore / song.reactionCount
+                  : 0;
+                return (
                 <li
                   key={song.id}
                   className='relative flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-xl px-4 pt-3 pb-6'
@@ -458,6 +462,19 @@ function RoomView({ room, onBack, isPrivileged, onRoomUpdate }: Props) {
                       breakdown={song.breakdown}
                     />
                   </div>
+                  {song.reactionCount > 0 && (
+                    <div className='absolute -bottom-3.5 right-4 z-10'>
+                      <span className={`flex items-center rounded-full border px-2.5 py-0.5 text-sm font-medium ${
+                        vibeAvg > 0
+                          ? 'bg-green-950 border-green-900 text-green-400'
+                          : vibeAvg < 0
+                          ? 'bg-red-950 border-red-900 text-red-400'
+                          : 'bg-gray-800 border-gray-700 text-gray-500'
+                      }`}>
+                        {vibeAvg > 0 ? '+' : ''}{vibeAvg.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
                   {song.spotifyId && (
                     <a
                       href={`https://open.spotify.com/track/${song.spotifyId}`}
@@ -481,7 +498,8 @@ function RoomView({ room, onBack, isPrivileged, onRoomUpdate }: Props) {
                     </button>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

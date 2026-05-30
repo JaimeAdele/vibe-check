@@ -7,10 +7,10 @@ import { getIO } from '../lib/socket';
 const router = Router();
 
 const EMOJI_VALUES: Record<string, number> = {
-  '🔥': 2,
-  '❤️': 1,
-  '🥱': -1,
-  '🤮': -2,
+  '🔥': 10,
+  '❤️': 5,
+  '🥱': -5,
+  '🤮': -10,
 };
 
 const VALID_EMOJIS = Object.keys(EMOJI_VALUES);
