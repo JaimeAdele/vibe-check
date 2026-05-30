@@ -34,19 +34,30 @@ function EmojiReaction({ songId, identifiedAt, breakdown }: Props) {
     });
   }
 
+  if (!windowOpen) {
+    return (
+      <div className='flex items-center gap-2 rounded-full bg-gray-800 border border-gray-700 px-3 py-0.5'>
+        {EMOJIS.map((emoji, i) => (
+          <span key={emoji} className='flex items-center gap-1 text-sm text-gray-500'>
+            {i > 0 && <span className='text-gray-700'>·</span>}
+            <span>{emoji}</span>
+            <span className='text-xs'>{breakdown[emoji] ?? 0}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className='flex items-center gap-1.5'>
       {EMOJIS.map((emoji) => (
         <button
           key={emoji}
           onClick={() => handleReact(emoji)}
-          disabled={!windowOpen}
-          className={`flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-sm transition-all select-none ${
-            !windowOpen
-              ? 'border-gray-700 bg-gray-800 text-gray-500 cursor-default'
-              : selectedEmoji === emoji
-              ? 'border-gray-500 bg-gray-700 ring-1 ring-gray-500 scale-110 cursor-pointer'
-              : 'border-gray-700 bg-gray-800 hover:border-gray-600 hover:bg-gray-700 cursor-pointer'
+          className={`flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-sm transition-all select-none cursor-pointer ${
+            selectedEmoji === emoji
+              ? 'border-gray-500 bg-gray-700 ring-1 ring-gray-500 scale-110'
+              : 'border-gray-700 bg-gray-950 hover:border-gray-600 hover:bg-gray-900'
           }`}
         >
           <span>{emoji}</span>
