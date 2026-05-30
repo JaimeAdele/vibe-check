@@ -32,15 +32,31 @@ model Event {
 }
 
 model Song {
-  id           String   @id @default(uuid())
-  eventId      String
-  title        String
-  artist       String
-  albumArt     String?
-  previewUrl   String?
-  spotifyId    String?
-  identifiedAt DateTime @default(now())
-  event        Event    @relation(fields: [eventId], references: [id])
+  id            String     @id @default(uuid())
+  eventId       String
+  title         String
+  artist        String
+  albumArt      String?
+  previewUrl    String?
+  spotifyId     String?
+  identifiedAt  DateTime   @default(now())
+  vibeScore     Int        @default(0)
+  reactionCount Int        @default(0)
+  event         Event      @relation(fields: [eventId], references: [id])
+  reactions     Reaction[]
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  songId    String
+  voterId   String
+  emoji     String
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([songId, voterId])
 }
 
 enum EventStatus {

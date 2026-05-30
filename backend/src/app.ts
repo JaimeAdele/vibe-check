@@ -7,6 +7,7 @@ import authRouter from './routes/auth';
 import identifyRouter from './routes/identify';
 import spotifyRouter from './routes/spotify';
 import venuesRouter from './routes/venues';
+import songsRouter from './routes/songs';
 
 const app = express();
 
@@ -46,5 +47,6 @@ app.use('/api/events', eventsRouter);
 app.use('/api/events/:id/identify', identifyRouter);
 app.use('/api/spotify', spotifyRouter);
 app.use('/api/venues', venuesRouter);
+app.use('/api/songs', songsRouter);
 
 export default app;

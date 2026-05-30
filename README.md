@@ -13,6 +13,7 @@ A real-time DJ set song identification platform. Attendees at a live event can i
 - 🔁 **Duplicate detection** — if the same song is identified twice in a row, it is skipped and the user sees an "Already playing" message instead of a duplicate entry
 - 📍 **Venues & geofencing** — events can be linked to a venue; regular users must be within the venue's geofence radius to identify songs (checked on every tap, not just room entry)
 - 🏟️ **Venue management** — admins can edit any venue's name, address, coordinates, and geofence radius; deleting a venue soft-deletes it (the row stays in the database so linked events are unaffected) and removes it from the event-creation dropdown; deleted venues can be restored
+- 🔥 **Song reactions** — attendees react to each song with 🔥 ❤️ 🥱 🤮 (no login required); reactions are tied to a server-issued anonymous voter cookie; one reaction per song per browser; reactions are only open for 15 minutes after a song is identified; vibe scores update live on all connected devices via Socket.io
 
 ---
 
@@ -186,6 +187,7 @@ All routes are prefixed with `/api`.
 | `POST` | `/venues/validate-location/:eventId` | Check if coordinates are within the event's venue geofence |
 | `PATCH` | `/events/:id/status` | Update event status (admin) |
 | `PATCH` | `/events/:id/startTime` | Update event start time (admin) |
+| `POST` | `/songs/:id/react` | Submit or change an emoji reaction (voter cookie required; 15-min window; Redis rate-limited) |
 
 ---
 

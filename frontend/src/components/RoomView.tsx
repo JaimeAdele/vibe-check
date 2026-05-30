@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRoomSocket } from '../hooks/useRoomSocket';
 import IdentifyButton from './IdentifyButton';
+import EmojiReaction from './EmojiReaction';
 
 interface SpotifySearchResult {
   spotifyId: string;
@@ -17,6 +18,8 @@ interface Song {
   albumArt: string | null;
   spotifyId: string | null;
   identifiedAt: string;
+  vibeScore: number;
+  reactionCount: number;
 }
 
 interface VenueSummary {
@@ -88,6 +91,10 @@ function RoomView({ room, onBack, isPrivileged, onRoomUpdate }: Props) {
   }, (newStatus) => {
     setStatus(newStatus as Room['status']);
     onRoomUpdate(room.id, { status: newStatus as Room['status'] });
+  }, ({ songId, vibeScore, reactionCount }) => {
+    setSongs((prev) =>
+      prev.map((s) => s.id === songId ? { ...s, vibeScore, reactionCount } : s)
+    );
   });
 
   function handleAddSong(e: React.FormEvent) {
@@ -440,6 +447,12 @@ function RoomView({ room, onBack, isPrivileged, onRoomUpdate }: Props) {
                     <p className='text-gray-400 text-sm truncate'>
                       {song.artist}
                     </p>
+                    <EmojiReaction
+                      songId={song.id}
+                      identifiedAt={song.identifiedAt}
+                      vibeScore={song.vibeScore}
+                      reactionCount={song.reactionCount}
+                    />
                   </div>
                   {song.spotifyId && (
                     <a
