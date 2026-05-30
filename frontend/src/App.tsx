@@ -115,32 +115,32 @@ function App() {
   const renderRoomList = (sectionRooms: Room[]) => (
     <ul className='flex flex-col gap-3'>
       {sectionRooms.map((room) => (
-        <li key={room.id} className='flex items-stretch gap-2'>
-          <button
+        <li key={room.id}>
+          <div
             onClick={() => handleRoomClick(room)}
-            className='flex-1 flex items-center justify-between bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-4 transition-colors cursor-pointer'
+            className='flex items-center justify-between bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-4 transition-colors cursor-pointer'
           >
             <div className='text-left'>
               <p className='text-white font-medium'>{room.name}</p>
               <p className='text-gray-500 text-xs mt-0.5'>{formatStartTime(room.startTime)}</p>
             </div>
             {isPrivileged && (
-              <span className='text-xs font-mono bg-gray-800 text-accent px-3 py-1 rounded-full shrink-0 ml-3'>
-                {room.roomCode}
-              </span>
+              <div className='flex items-center gap-2 shrink-0 ml-3'>
+                <span className='text-xs font-mono bg-gray-800 text-accent px-3 py-1 rounded-full'>
+                  {room.roomCode}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRemoveEvent(room.id); }}
+                  className='p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer'
+                  aria-label='Delete event'
+                >
+                  <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+                    <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
+                  </svg>
+                </button>
+              </div>
             )}
-          </button>
-          {isPrivileged && (
-            <button
-              onClick={() => handleRemoveEvent(room.id)}
-              className='self-stretch w-14 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer'
-              aria-label='Delete event'
-            >
-              <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
-                <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
-              </svg>
-            </button>
-          )}
+          </div>
         </li>
       ))}
     </ul>
