@@ -10,8 +10,9 @@ function generateRoomCode(): string {
 }
 
 // POST /api/events — create an event (operator only)
+// Accepts optional `rooms: string[]`; defaults to one room named after the event.
 router.post('/', requireAuth, requireOperator, async (req: Request, res: Response) => {
-  const { name, startTime, venueId } = req.body;
+  const { name, startTime, venueId, rooms: roomNames } = req.body;
 
   if (!name || typeof name !== 'string') {
     res.status(400).json({ error: 'name is required' });
@@ -23,18 +24,39 @@ router.post('/', requireAuth, requireOperator, async (req: Request, res: Respons
   }
 
   try {
-    const event = await prisma.event.create({
+    const ev = await prisma.event.create({
       data: {
         name,
         startTime: new Date(startTime),
         operatorId: req.user!.userId,
         venueId: venueId ?? null,
       },
+    });
+
+    const namesToCreate: string[] =
+      Array.isArray(roomNames) && roomNames.length > 0
+        ? (roomNames as string[]).filter(r => typeof r === 'string' && r.trim())
+        : [name];
+
+    for (const roomName of namesToCreate) {
+      await prisma.room.create({
+        data: { eventId: ev.id, name: roomName.trim(), roomCode: generateRoomCode() },
+      });
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: ev.id },
       include: {
         venue: { select: { id: true, name: true, address: true } },
-        rooms: true,
+        rooms: {
+          select: {
+            id: true, name: true, roomCode: true, status: true,
+            djs: { select: { user: { select: { id: true, name: true } } } },
+          },
+        },
       },
     });
+
     res.status(201).json(event);
   } catch {
     res.status(500).json({ error: 'Failed to create event' });
@@ -163,6 +185,36 @@ router.patch('/:id/rooms/:roomId/status', requireAuth, requirePrivileged, async 
     res.json(updated);
   } catch {
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// PATCH /api/events/:id/rooms/:roomId — rename a room
+router.patch('/:id/rooms/:roomId', requireAuth, requirePrivileged, async (req: Request, res: Response) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    res.status(400).json({ error: 'name is required' });
+    return;
+  }
+
+  try {
+    const room = await prisma.room.findUnique({
+      where: { id: req.params.roomId },
+      include: { event: { select: { operatorId: true } } },
+    });
+    if (!room || room.eventId !== req.params.id) {
+      res.status(404).json({ error: 'Room not found' }); return;
+    }
+    if (req.user!.role !== 'ADMIN' && room.event.operatorId !== req.user!.userId) {
+      res.status(403).json({ error: 'Not authorized' }); return;
+    }
+
+    const updated = await prisma.room.update({
+      where: { id: req.params.roomId },
+      data: { name: name.trim() },
+    });
+    res.json(updated);
+  } catch {
+    res.status(500).json({ error: 'Failed to rename room' });
   }
 });
 

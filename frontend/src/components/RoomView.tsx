@@ -81,6 +81,9 @@ function RoomView({ room, event, initialSongs, isPrivileged, slug }: Props) {
   const [searchResults, setSearchResults] = useState<SpotifySearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [status, setStatus] = useState(room.status);
+  const [roomName, setRoomName] = useState(room.name);
+  const [editingRoomName, setEditingRoomName] = useState(false);
+  const [roomNameInput, setRoomNameInput] = useState(room.name);
   const [startTime, setStartTime] = useState(event.startTime);
   const [editingStartTime, setEditingStartTime] = useState(false);
   const [startTimeInput, setStartTimeInput] = useState(toInputValue(event.startTime));
@@ -157,6 +160,19 @@ function RoomView({ room, event, initialSongs, isPrivileged, slug }: Props) {
     });
     if (res.ok) {
       setStatus(newStatus as Room['status']);
+    }
+  }
+
+  async function handleSaveRoomName() {
+    const res = await fetch(`/api/events/${event.id}/rooms/${room.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: roomNameInput.trim() }),
+      credentials: 'include',
+    });
+    if (res.ok) {
+      setRoomName(roomNameInput.trim());
+      setEditingRoomName(false);
     }
   }
 
@@ -261,7 +277,30 @@ function RoomView({ room, event, initialSongs, isPrivileged, slug }: Props) {
                   </span>
                 )}
               </div>
-              <h1 className='text-2xl font-bold text-white'>{room.name}</h1>
+              {editingRoomName ? (
+                <div className='flex items-center gap-2'>
+                  <input
+                    value={roomNameInput}
+                    onChange={e => setRoomNameInput(e.target.value)}
+                    className='bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xl font-bold focus:outline-none focus:border-accent w-full'
+                    autoFocus
+                  />
+                  <button onClick={handleSaveRoomName} disabled={!roomNameInput.trim()} className='text-sm text-accent hover:text-accent-hover transition-colors cursor-pointer disabled:opacity-40 shrink-0'>Save</button>
+                  <button onClick={() => { setEditingRoomName(false); setRoomNameInput(roomName); }} className='text-sm text-gray-500 hover:text-white transition-colors cursor-pointer shrink-0'>Cancel</button>
+                </div>
+              ) : (
+                <div className='flex items-center gap-2'>
+                  <h1 className='text-2xl font-bold text-white'>{roomName}</h1>
+                  {isPrivileged && (
+                    <button
+                      onClick={() => { setRoomNameInput(roomName); setEditingRoomName(true); }}
+                      className='text-sm text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded-lg transition-colors cursor-pointer shrink-0'
+                    >
+                      Rename
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {isPrivileged && (

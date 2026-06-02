@@ -96,6 +96,10 @@ export default function OperatorPage() {
   const [newEventVenueId, setNewEventVenueId] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
 
+  // Room mode for event creation
+  const [roomMode, setRoomMode] = useState<'single' | 'multi'>('single');
+  const [multiRoomNames, setMultiRoomNames] = useState<string[]>(['', '']);
+
   // Venue combobox (for event form)
   const [venueSearch, setVenueSearch] = useState('');
   const [venueDropdownOpen, setVenueDropdownOpen] = useState(false);
@@ -119,10 +123,14 @@ export default function OperatorPage() {
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Add room (one event at a time)
-  const [addingRoomTo, setAddingRoomTo] = useState<string | null>(null);
-  const [newRoomName, setNewRoomName] = useState('');
-  const [creatingRoom, setCreatingRoom] = useState(false);
+  // Add room modal
+  const [addRoomModal, setAddRoomModal] = useState<{
+    eventId: string;
+    existingRoom: { id: string; name: string } | null;
+  } | null>(null);
+  const [addRoomNewName, setAddRoomNewName] = useState('');
+  const [addRoomRenameTo, setAddRoomRenameTo] = useState('');
+  const [addingRoom, setAddingRoom] = useState(false);
 
   // Status dropdown (one room at a time)
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
@@ -291,6 +299,8 @@ export default function OperatorPage() {
   function resetCreateEventForm() {
     setNewEventName(''); setNewEventTime(''); setNewEventVenueId('');
     setVenueSearch(''); setVenueDropdownOpen(false);
+    setRoomMode('single');
+    setMultiRoomNames(['', '']);
     setShowCreateEvent(false);
   }
 
@@ -298,15 +308,19 @@ export default function OperatorPage() {
     e.preventDefault();
     setCreatingEvent(true);
     try {
+      const body: Record<string, unknown> = {
+        name: newEventName,
+        startTime: new Date(newEventTime).toISOString(),
+        venueId: newEventVenueId || null,
+      };
+      if (roomMode === 'multi') {
+        body.rooms = multiRoomNames.map(r => r.trim()).filter(Boolean);
+      }
       const res = await fetch('/api/events', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newEventName,
-          startTime: new Date(newEventTime).toISOString(),
-          venueId: newEventVenueId || null,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) return;
       const event = await res.json();
@@ -324,35 +338,75 @@ export default function OperatorPage() {
     if (res.ok) setOperator(prev => prev ? { ...prev, events: prev.events.filter(ev => ev.id !== eventId) } : prev);
   }
 
-  // ── Create / delete room ──────────────────────────────────────────────────
+  // ── Add room modal ────────────────────────────────────────────────────────
 
-  async function handleCreateRoom(e: React.FormEvent, eventId: string) {
+  function openAddRoomModal(event: Event) {
+    const existingRoom = event.rooms.length === 1 ? { id: event.rooms[0].id, name: event.rooms[0].name } : null;
+    setAddRoomModal({ eventId: event.id, existingRoom });
+    setAddRoomNewName('');
+    setAddRoomRenameTo(existingRoom?.name ?? '');
+  }
+
+  function closeAddRoomModal() {
+    setAddRoomModal(null);
+    setAddRoomNewName('');
+    setAddRoomRenameTo('');
+  }
+
+  async function handleAddRoom(e: React.FormEvent) {
     e.preventDefault();
-    setCreatingRoom(true);
+    if (!addRoomModal) return;
+    setAddingRoom(true);
     try {
+      const { eventId, existingRoom } = addRoomModal;
+
+      // Rename the existing room if the operator changed the name
+      if (existingRoom && addRoomRenameTo.trim() && addRoomRenameTo.trim() !== existingRoom.name) {
+        await fetch(`/api/events/${eventId}/rooms/${existingRoom.id}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: addRoomRenameTo.trim() }),
+        });
+        setOperator(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            events: prev.events.map(ev =>
+              ev.id === eventId
+                ? { ...ev, rooms: ev.rooms.map(r => r.id === existingRoom.id ? { ...r, name: addRoomRenameTo.trim() } : r) }
+                : ev
+            ),
+          };
+        });
+      }
+
+      // Create the new room
       const res = await fetch(`/api/events/${eventId}/rooms`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newRoomName }),
+        body: JSON.stringify({ name: addRoomNewName.trim() }),
       });
-      if (!res.ok) return;
-      const room = await res.json();
-      setOperator(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          events: prev.events.map(ev =>
-            ev.id === eventId ? { ...ev, rooms: [...ev.rooms, { ...room, djs: [] }] } : ev
-          ),
-        };
-      });
-      setNewRoomName('');
-      setAddingRoomTo(null);
+      if (res.ok) {
+        const room = await res.json();
+        setOperator(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            events: prev.events.map(ev =>
+              ev.id === eventId ? { ...ev, rooms: [...ev.rooms, { ...room, djs: [] }] } : ev
+            ),
+          };
+        });
+      }
+      closeAddRoomModal();
     } finally {
-      setCreatingRoom(false);
+      setAddingRoom(false);
     }
   }
+
+  // ── Delete room ───────────────────────────────────────────────────────────
 
   async function handleDeleteRoom(e: React.MouseEvent, eventId: string, roomId: string) {
     e.stopPropagation();
@@ -397,15 +451,6 @@ export default function OperatorPage() {
     }
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-
-  function handleEventClick(event: Event) {
-    if (isPagePrivileged) return;
-    if (event.rooms.length === 0) return;
-    if (event.rooms.length === 1) navigate(`/${slug}/room/${event.rooms[0].roomCode}`);
-    else navigate(`/${slug}/event/${event.id}`);
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) return <Layout backTo='/'><p className='text-gray-600 text-sm text-center py-12'>Loading…</p></Layout>;
@@ -415,14 +460,18 @@ export default function OperatorPage() {
   const upcoming = operator.events.filter(e => primaryStatus(e) === 'UPCOMING' || e.rooms.length === 0);
   const closed = operator.events.filter(e => e.rooms.length > 0 && primaryStatus(e) === 'CLOSED');
 
+  const multiRoomValid = roomMode !== 'multi' || multiRoomNames.filter(r => r.trim()).length >= 2;
+
   function renderEvent(event: Event) {
     const status = primaryStatus(event);
-    const clickable = !isPagePrivileged && event.rooms.length > 0;
+    // Single-room events navigate directly to the room for everyone (operator + public).
+    // Multi-room events are not card-clickable; rooms are shown inline.
+    const clickable = event.rooms.length === 1;
 
     return (
       <li key={event.id}>
         <div
-          onClick={() => handleEventClick(event)}
+          onClick={() => { if (clickable) navigate(`/${slug}/room/${event.rooms[0].roomCode}`); }}
           className={`bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 transition-colors ${
             clickable ? 'hover:bg-gray-800 hover:border-gray-700 cursor-pointer' : ''
           }`}
@@ -434,108 +483,105 @@ export default function OperatorPage() {
               {event.venue && <p className='text-gray-500 text-xs mt-0.5'>📍 {event.venue.name}</p>}
             </div>
 
-            {isPagePrivileged ? (
-              <button
-                onClick={e => handleDeleteEvent(e, event.id)}
-                className='p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer shrink-0'
-                aria-label='Delete event'
-              >
-                <svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
-                  <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
-                </svg>
-              </button>
-            ) : (
-              <div className='flex flex-col items-end gap-1.5 shrink-0'>
-                {event.rooms.length === 0 && <span className='text-xs text-gray-600'>No rooms yet</span>}
-                {event.rooms.length === 1 && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusStyle[status]}`}>
-                    {event.rooms[0].name}
-                  </span>
-                )}
-                {event.rooms.length > 1 && (
-                  <span className='text-xs text-gray-400'>{event.rooms.length} rooms →</span>
-                )}
-              </div>
-            )}
+            <div className='flex flex-col items-end gap-1.5 shrink-0'>
+              {isPagePrivileged ? (
+                <button
+                  onClick={e => handleDeleteEvent(e, event.id)}
+                  className='p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer'
+                  aria-label='Delete event'
+                >
+                  <svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+                    <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
+                  </svg>
+                </button>
+              ) : (
+                <>
+                  {event.rooms.length === 0 && <span className='text-xs text-gray-600'>No rooms yet</span>}
+                  {event.rooms.length === 1 && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusStyle[status]}`}>
+                      {status}
+                    </span>
+                  )}
+                  {/* multi-room: no header badge — room buttons shown inline below */}
+                </>
+              )}
+            </div>
           </div>
 
-          {isPagePrivileged && (
+          {/* Public view: room buttons for multi-room events */}
+          {!isPagePrivileged && event.rooms.length > 1 && (
             <div className='mt-3 flex flex-col gap-2' onClick={e => e.stopPropagation()}>
               {event.rooms.map(room => (
-                <div key={room.id} className='flex items-center gap-2 pl-1'>
-                  <div className='relative'>
-                    <button
-                      onClick={e => { e.stopPropagation(); setStatusDropdown(statusDropdown === room.id ? null : room.id); }}
-                      className={`text-xs font-medium px-2 py-0.5 rounded-full transition-colors cursor-pointer ${statusStyle[room.status]}`}
-                    >
-                      {room.status}
-                    </button>
-                    {statusDropdown === room.id && (
-                      <div className='absolute left-0 top-full mt-1 z-10 bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-lg'>
-                        {(['UPCOMING', 'ACTIVE', 'CLOSED'] as const).filter(s => s !== room.status).map(s => (
-                          <button
-                            key={s}
-                            onClick={e => handleStatusChange(e, event.id, room.id, s)}
-                            className={`block w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-gray-700 transition-colors cursor-pointer ${statusStyle[s]}`}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => navigate(`/${slug}/room/${room.roomCode}`)}
-                    className='flex-1 text-left text-sm text-gray-300 hover:text-white transition-colors cursor-pointer truncate'
-                  >
-                    {room.name}
-                  </button>
-
-                  <button
-                    onClick={e => handleDeleteRoom(e, event.id, room.id)}
-                    className='p-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer shrink-0'
-                    aria-label='Delete room'
-                  >
-                    <svg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
-                      <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
-                    </svg>
-                  </button>
-                </div>
-              ))}
-
-              {addingRoomTo === event.id ? (
-                <form onSubmit={e => handleCreateRoom(e, event.id)} className='flex gap-2 mt-1'>
-                  <input
-                    value={newRoomName}
-                    onChange={e => setNewRoomName(e.target.value)}
-                    placeholder='Room name (e.g. Main Stage)'
-                    autoFocus
-                    className={inputClass + ' flex-1'}
-                  />
-                  <button
-                    type='submit'
-                    disabled={!newRoomName.trim() || creatingRoom}
-                    className='bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-3 py-2 rounded-xl transition-colors cursor-pointer shrink-0'
-                  >
-                    {creatingRoom ? '…' : 'Add'}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => { setAddingRoomTo(null); setNewRoomName(''); }}
-                    className='text-gray-500 hover:text-white text-sm px-2 transition-colors cursor-pointer'
-                  >
-                    Cancel
-                  </button>
-                </form>
-              ) : (
                 <button
-                  onClick={() => { setAddingRoomTo(event.id); setNewRoomName(''); }}
-                  className='text-xs text-gray-500 hover:text-accent transition-colors cursor-pointer text-left mt-1'
+                  key={room.id}
+                  onClick={() => navigate(`/${slug}/room/${room.roomCode}`)}
+                  className='flex items-center justify-between w-full px-3 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors cursor-pointer text-left'
                 >
-                  + Add room
+                  <span className='text-sm text-white font-medium'>{room.name}</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusStyle[room.status]}`}>
+                    {room.status}
+                  </span>
                 </button>
+              ))}
+            </div>
+          )}
+
+          {/* Operator view: room rows (multi-room only) + add room button */}
+          {isPagePrivileged && (
+            <div className='mt-3' onClick={e => e.stopPropagation()}>
+              {event.rooms.length > 1 && (
+                <div className='flex flex-col gap-2 mb-3'>
+                  {event.rooms.map(room => (
+                    <div key={room.id} className='flex items-center gap-2 pl-1'>
+                      <div className='relative'>
+                        <button
+                          onClick={e => { e.stopPropagation(); setStatusDropdown(statusDropdown === room.id ? null : room.id); }}
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full transition-colors cursor-pointer ${statusStyle[room.status]}`}
+                        >
+                          {room.status}
+                        </button>
+                        {statusDropdown === room.id && (
+                          <div className='absolute left-0 top-full mt-1 z-10 bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-lg'>
+                            {(['UPCOMING', 'ACTIVE', 'CLOSED'] as const).filter(s => s !== room.status).map(s => (
+                              <button
+                                key={s}
+                                onClick={e => handleStatusChange(e, event.id, room.id, s)}
+                                className={`block w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-gray-700 transition-colors cursor-pointer ${statusStyle[s]}`}
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => navigate(`/${slug}/room/${room.roomCode}`)}
+                        className='flex-1 text-left text-sm text-gray-300 hover:text-white transition-colors cursor-pointer truncate'
+                      >
+                        {room.name}
+                      </button>
+
+                      <button
+                        onClick={e => handleDeleteRoom(e, event.id, room.id)}
+                        className='p-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer shrink-0'
+                        aria-label='Delete room'
+                      >
+                        <svg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+                          <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
+
+              <button
+                onClick={() => openAddRoomModal(event)}
+                className='text-xs font-medium text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 px-3 py-1.5 rounded-lg transition-colors cursor-pointer'
+              >
+                + Add room
+              </button>
             </div>
           )}
         </div>
@@ -622,10 +668,73 @@ export default function OperatorPage() {
                   )}
                 </div>
 
+                {/* Room mode toggle */}
+                <div>
+                  <p className='text-xs text-gray-400 mb-2'>Room setup</p>
+                  <div className='flex gap-2'>
+                    <button
+                      type='button'
+                      onClick={() => setRoomMode('single')}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                        roomMode === 'single' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Single room
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => setRoomMode('multi')}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                        roomMode === 'multi' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Multiple rooms
+                    </button>
+                  </div>
+                </div>
+
+                {roomMode === 'multi' && (
+                  <div className='flex flex-col gap-2'>
+                    {multiRoomNames.map((name, i) => (
+                      <div key={i} className='flex gap-2'>
+                        <input
+                          value={name}
+                          onChange={e => {
+                            const updated = [...multiRoomNames];
+                            updated[i] = e.target.value;
+                            setMultiRoomNames(updated);
+                          }}
+                          placeholder={`Room ${i + 1} name (e.g. Main Stage)`}
+                          className={inputClass + ' flex-1'}
+                        />
+                        {multiRoomNames.length > 2 && (
+                          <button
+                            type='button'
+                            onClick={() => setMultiRoomNames(prev => prev.filter((_, j) => j !== i))}
+                            className='p-2.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer shrink-0'
+                            aria-label='Remove room'
+                          >
+                            <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+                              <line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type='button'
+                      onClick={() => setMultiRoomNames(prev => [...prev, ''])}
+                      className='text-xs text-gray-500 hover:text-accent transition-colors cursor-pointer text-left'
+                    >
+                      + Add another room
+                    </button>
+                  </div>
+                )}
+
                 <div className='flex gap-2'>
                   <button
                     type='submit'
-                    disabled={!newEventName.trim() || !newEventTime || creatingEvent}
+                    disabled={!newEventName.trim() || !newEventTime || !multiRoomValid || creatingEvent}
                     className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
                   >
                     {creatingEvent ? 'Creating…' : 'Create event'}
@@ -768,6 +877,61 @@ export default function OperatorPage() {
                 <button
                   type='button'
                   onClick={closeVenueModal}
+                  className='flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add room modal */}
+      {addRoomModal && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70' onClick={closeAddRoomModal}>
+          <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md' onClick={e => e.stopPropagation()}>
+            <h2 className='text-white font-semibold mb-4'>Add room</h2>
+            <form onSubmit={handleAddRoom} className='flex flex-col gap-3'>
+
+              {addRoomModal.existingRoom && (
+                <div>
+                  <label className='text-xs text-gray-400 block mb-1.5'>
+                    Rename "{addRoomModal.existingRoom.name}" to (optional)
+                  </label>
+                  <input
+                    value={addRoomRenameTo}
+                    onChange={e => setAddRoomRenameTo(e.target.value)}
+                    placeholder={addRoomModal.existingRoom.name}
+                    className={inputClass}
+                  />
+                </div>
+              )}
+
+              <div>
+                {addRoomModal.existingRoom && (
+                  <label className='text-xs text-gray-400 block mb-1.5'>New room name</label>
+                )}
+                <input
+                  value={addRoomNewName}
+                  onChange={e => setAddRoomNewName(e.target.value)}
+                  placeholder='New room name (e.g. Stage B)'
+                  autoFocus
+                  className={inputClass}
+                />
+              </div>
+
+              <div className='flex gap-2 mt-1'>
+                <button
+                  type='submit'
+                  disabled={!addRoomNewName.trim() || addingRoom}
+                  className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
+                >
+                  {addingRoom ? 'Adding…' : 'Add room'}
+                </button>
+                <button
+                  type='button'
+                  onClick={closeAddRoomModal}
                   className='flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
                 >
                   Cancel
