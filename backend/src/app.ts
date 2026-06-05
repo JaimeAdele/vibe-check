@@ -57,9 +57,9 @@ app.use('/api/venues', venuesRouter);
 app.use('/api/songs', songsRouter);
 app.use('/api/operators', operatorsRouter);
 
-app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 export default app;
