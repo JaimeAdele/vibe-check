@@ -2,5 +2,5 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "cd /app/backend && npx prisma migrate deploy && node dist/index.js"
+startCommand = "sh -c 'cd /app/backend && npx prisma migrate deploy && node dist/index.js'"
 healthcheckPath = "/api/health"
