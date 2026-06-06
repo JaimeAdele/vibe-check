@@ -9,8 +9,14 @@ const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
-// POST /api/auth/register - create an admin account
+// POST /api/auth/register - create the first admin account (locked after one exists)
 router.post('/register', async (req, res) => {
+  const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  if (existingAdmin) {
+    res.status(403).json({ error: 'Admin account already exists' });
+    return;
+  }
+
   const { email, password, name } = req.body;
 
   if (!email || !password) {
