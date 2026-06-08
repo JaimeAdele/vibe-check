@@ -51,7 +51,7 @@ export default function Layout({ children, title = 'Vibe Check', subtitle, backT
                   </button>
                 )}
                 <button
-                  onClick={logout}
+                  onClick={() => { logout(); navigate('/'); }}
                   className='text-gray-500 hover:text-white transition-colors cursor-pointer'
                 >
                   Sign out

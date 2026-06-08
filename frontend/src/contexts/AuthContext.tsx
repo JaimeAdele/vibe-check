@@ -9,7 +9,7 @@ export interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   isPrivileged: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ slug: string | null; role: string } | null>;
   logout: () => void;
 }
 
@@ -32,18 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isPrivileged = user?.role === 'OPERATOR' || user?.role === 'ADMIN';
 
-  async function login(email: string, password: string): Promise<boolean> {
+  async function login(email: string, password: string): Promise<{ slug: string | null; role: string } | null> {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const data = await res.json();
     // login endpoint returns 'id', /me returns 'userId' — normalise here
     setUser({ userId: data.id, role: data.role });
-    return true;
+    return { slug: data.slug, role: data.role };
   }
 
   function logout() {

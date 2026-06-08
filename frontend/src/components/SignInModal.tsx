@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Props {
@@ -7,16 +8,19 @@ interface Props {
 
 export default function SignInModal({ onClose }: Props) {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    const success = await login(email, password);
-    if (success) {
+    const result = await login(email, password);
+    if (result) {
       onClose();
+      if (result.role === 'OPERATOR' && result.slug) navigate(`/${result.slug}`);
+      else if (result.role === 'ADMIN') navigate('/admin');
     } else {
       setError(true);
     }
