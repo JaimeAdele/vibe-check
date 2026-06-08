@@ -64,7 +64,7 @@ const user = await prisma.user.findUnique({ where: { email } });
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  res.json({ id: user.id, email: user.email, role: user.role });
+  res.json({ id: user.id, email: user.email, role: user.role, slug: user.slug ?? null });
 });
 
 // GET /api/auth/me - return current user's identity and role
