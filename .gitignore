@@ -24,3 +24,6 @@ screenshots/
 # Editor
 .vscode/
 *.swp
+
+# One-off scripts with hardcoded credentials
+backend/scripts/

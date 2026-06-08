@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import VenueCreationForm, { type CreatedVenue } from './VenueCreationForm';
 
 interface Venue {
   id: string;
@@ -10,19 +11,15 @@ interface Venue {
   isActive: boolean;
 }
 
-interface AdminVenuesPageProps {
-  onBack: () => void;
-}
+const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-sm';
 
-function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
+export default function AdminVenuesPanel() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
 
-  // Which venue is currently open for editing
+  // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  // Edit form fields
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editLat, setEditLat] = useState('');
@@ -41,7 +38,9 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
       .catch(() => setLoading(false));
   }, []);
 
-  // ── Edit helpers ────────────────────────────────────────────────────────────
+  function handleVenueCreated(venue: CreatedVenue) {
+    setVenues(prev => [...prev, venue].sort((a, b) => a.name.localeCompare(b.name)));
+  }
 
   function startEdit(venue: Venue) {
     setEditingId(venue.id);
@@ -62,14 +61,8 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
     const lat = parseFloat(editLat);
     const lng = parseFloat(editLng);
 
-    if (!editName.trim()) {
-      setEditError('Name is required.');
-      return;
-    }
-    if (isNaN(lat) || isNaN(lng)) {
-      setEditError('Latitude and longitude must be valid numbers.');
-      return;
-    }
+    if (!editName.trim()) { setEditError('Name is required.'); return; }
+    if (isNaN(lat) || isNaN(lng)) { setEditError('Latitude and longitude must be valid numbers.'); return; }
 
     setSaving(true);
     setEditError('');
@@ -86,10 +79,7 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
           geoFenceRadius: editRadius,
         }),
       });
-      if (!res.ok) {
-        setEditError('Failed to save changes. Please try again.');
-        return;
-      }
+      if (!res.ok) { setEditError('Failed to save changes. Please try again.'); return; }
       const updated: Venue = await res.json();
       setVenues(prev => prev.map(v => (v.id === id ? updated : v)));
       setEditingId(null);
@@ -100,70 +90,47 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
     }
   }
 
-  // ── Delete / restore ────────────────────────────────────────────────────────
-
   async function handleDelete(id: string, name: string) {
-    if (
-      !window.confirm(
-        `Remove "${name}" from the venue list?\n\nThe venue won't be deleted — any events linked to it are safe. You can restore it any time.`,
-      )
-    )
-      return;
-
-    const res = await fetch(`/api/venues/${id}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
+    if (!window.confirm(`Delete "${name}"?\n\nIf this venue has no events linked to it, it will be permanently deleted. Otherwise it will be hidden and can be restored.`)) return;
+    const res = await fetch(`/api/venues/${id}`, { method: 'DELETE', credentials: 'include' });
     if (res.ok) {
-      const updated: Venue = await res.json();
-      setVenues(prev => prev.map(v => (v.id === id ? updated : v)));
-      // If we were editing this venue, close the form
-      if (editingId === id) setEditingId(null);
+      const data = await res.json();
+      if (data.deleted) {
+        setVenues(prev => prev.filter(v => v.id !== id));
+        if (editingId === id) setEditingId(null);
+      } else {
+        setVenues(prev => prev.map(v => (v.id === id ? data.venue : v)));
+        if (editingId === id) setEditingId(null);
+      }
     }
   }
 
   async function handleRestore(id: string) {
-    const res = await fetch(`/api/venues/${id}/restore`, {
-      method: 'PATCH',
-      credentials: 'include',
-    });
+    const res = await fetch(`/api/venues/${id}/restore`, { method: 'PATCH', credentials: 'include' });
     if (res.ok) {
       const updated: Venue = await res.json();
       setVenues(prev => prev.map(v => (v.id === id ? updated : v)));
     }
   }
 
-  // ── Derived lists ───────────────────────────────────────────────────────────
-
   const activeVenues = venues.filter(v => v.isActive);
   const inactiveVenues = venues.filter(v => !v.isActive);
 
-  // ── Render helpers ──────────────────────────────────────────────────────────
-
   function renderVenueRow(venue: Venue) {
     const isEditing = editingId === venue.id;
-
     return (
       <li key={venue.id} className='bg-gray-900 border border-gray-800 rounded-xl overflow-hidden'>
-        {/* Top row — name + action buttons */}
         <div className='flex items-center justify-between px-4 py-3 gap-3'>
           <div className='min-w-0'>
             <p className={`font-medium truncate ${venue.isActive ? 'text-white' : 'text-gray-500'}`}>
               {venue.name}
               {!venue.isActive && (
-                <span className='ml-2 text-xs font-mono bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full'>
-                  inactive
-                </span>
+                <span className='ml-2 text-xs font-mono bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full'>inactive</span>
               )}
             </p>
-            {venue.address && (
-              <p className='text-xs text-gray-500 mt-0.5 truncate'>{venue.address}</p>
-            )}
-            <p className='text-xs text-gray-600 mt-0.5'>
-              {venue.geoFenceRadius}m radius · {venue.lat.toFixed(5)}, {venue.lng.toFixed(5)}
-            </p>
+            {venue.address && <p className='text-xs text-gray-500 mt-0.5 truncate'>{venue.address}</p>}
+            <p className='text-xs text-gray-600 mt-0.5'>{venue.geoFenceRadius}m radius</p>
           </div>
-
           <div className='flex items-center gap-2 shrink-0'>
             {venue.isActive ? (
               <>
@@ -191,46 +158,21 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
           </div>
         </div>
 
-        {/* Inline edit form — only shown for the venue being edited */}
         {isEditing && (
           <div className='border-t border-gray-800 px-4 py-4 flex flex-col gap-3'>
             <p className='text-xs text-gray-400 font-medium uppercase tracking-widest'>Edit venue</p>
-
-            <input
-              value={editName}
-              onChange={e => setEditName(e.target.value)}
-              placeholder='Venue name'
-              className='w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-sm'
-            />
-
-            <input
-              value={editAddress}
-              onChange={e => setEditAddress(e.target.value)}
-              placeholder='Address (optional)'
-              className='w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-sm'
-            />
-
+            <input value={editName} onChange={e => setEditName(e.target.value)} placeholder='Venue name' className={inputClass} />
+            <input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder='Address (optional)' className={inputClass} />
             <div className='flex gap-3'>
               <div className='flex-1'>
                 <label className='block text-xs text-gray-500 mb-1'>Latitude</label>
-                <input
-                  value={editLat}
-                  onChange={e => setEditLat(e.target.value)}
-                  placeholder='e.g. 51.53320'
-                  className='w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-sm font-mono'
-                />
+                <input value={editLat} onChange={e => setEditLat(e.target.value)} placeholder='e.g. 51.53320' className={`${inputClass} font-mono`} />
               </div>
               <div className='flex-1'>
                 <label className='block text-xs text-gray-500 mb-1'>Longitude</label>
-                <input
-                  value={editLng}
-                  onChange={e => setEditLng(e.target.value)}
-                  placeholder='e.g. -0.07624'
-                  className='w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-sm font-mono'
-                />
+                <input value={editLng} onChange={e => setEditLng(e.target.value)} placeholder='e.g. -0.07624' className={`${inputClass} font-mono`} />
               </div>
             </div>
-
             <div className='flex items-center gap-3'>
               <label className='text-xs text-gray-400 shrink-0'>Geofence radius</label>
               <input
@@ -243,15 +185,13 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
               />
               <span className='text-xs text-gray-500'>metres</span>
             </div>
-
             {editError && <p className='text-red-400 text-xs'>{editError}</p>}
-
             <button
               onClick={() => saveEdit(venue.id)}
               disabled={saving}
               className='w-full bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold px-5 py-2.5 rounded-xl transition-colors cursor-pointer text-sm'
             >
-              {saving ? 'Saving...' : 'Save changes'}
+              {saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         )}
@@ -259,83 +199,53 @@ function AdminVenuesPage({ onBack }: AdminVenuesPageProps) {
     );
   }
 
-  // ── Main render ─────────────────────────────────────────────────────────────
-
   return (
-    <div className='min-h-screen bg-gray-950 flex flex-col items-center py-8 sm:py-12'>
-      <div className='w-full max-w-lg px-4'>
-        {/* Header */}
-        <div className='flex items-center justify-between mb-8'>
-          <div>
-            <button
-              onClick={onBack}
-              className='flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors cursor-pointer text-sm mb-2'
-            >
-              <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
-                <polyline points='15 18 9 12 15 6' />
-              </svg>
-              Back
-            </button>
-            <h1 className='text-2xl font-bold text-white tracking-tight'>Manage Venues</h1>
-            <p className='text-gray-500 text-sm mt-0.5'>
-              {activeVenues.length} active{inactiveVenues.length > 0 ? `, ${inactiveVenues.length} inactive` : ''}
-            </p>
-          </div>
-        </div>
+    <div className='flex flex-col gap-8'>
 
-        {loading ? (
-          <p className='text-gray-500 text-sm'>Loading venues…</p>
-        ) : venues.length === 0 ? (
-          <p className='text-gray-500 text-sm'>No venues yet. Create one when making an event.</p>
-        ) : (
-          <div className='flex flex-col gap-8'>
-            {/* Active venues */}
-            {activeVenues.length > 0 && (
-              <div>
-                <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3'>
-                  Active
-                </h2>
-                <ul className='flex flex-col gap-2'>
-                  {activeVenues.map(renderVenueRow)}
-                </ul>
-              </div>
-            )}
-
-            {/* Inactive venues — hidden behind a toggle to avoid clutter */}
-            {inactiveVenues.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setShowInactive(prev => !prev)}
-                  className='flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-gray-600 hover:text-gray-400 transition-colors cursor-pointer mb-3'
-                >
-                  <svg
-                    width='12'
-                    height='12'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2.5'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    className={`transition-transform ${showInactive ? 'rotate-90' : ''}`}
-                  >
-                    <polyline points='9 18 15 12 9 6' />
-                  </svg>
-                  Inactive ({inactiveVenues.length})
-                </button>
-
-                {showInactive && (
-                  <ul className='flex flex-col gap-2'>
-                    {inactiveVenues.map(renderVenueRow)}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+      {/* Create venue */}
+      <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6'>
+        <h2 className='text-white font-semibold mb-4'>Add a venue</h2>
+        <VenueCreationForm onCreated={handleVenueCreated} submitLabel='Add venue' />
       </div>
+
+      {/* Venue list */}
+      {loading ? (
+        <p className='text-gray-500 text-sm'>Loading venues…</p>
+      ) : venues.length === 0 ? (
+        <p className='text-gray-500 text-sm text-center py-8'>No venues yet.</p>
+      ) : (
+        <div className='flex flex-col gap-6'>
+          {activeVenues.length > 0 && (
+            <div>
+              <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3'>
+                Active · {activeVenues.length}
+              </h2>
+              <ul className='flex flex-col gap-2'>{activeVenues.map(renderVenueRow)}</ul>
+            </div>
+          )}
+
+          {inactiveVenues.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowInactive(prev => !prev)}
+                className='flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-gray-600 hover:text-gray-400 transition-colors cursor-pointer mb-3'
+              >
+                <svg
+                  width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor'
+                  strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'
+                  className={`transition-transform ${showInactive ? 'rotate-90' : ''}`}
+                >
+                  <polyline points='9 18 15 12 9 6' />
+                </svg>
+                Inactive ({inactiveVenues.length})
+              </button>
+              {showInactive && (
+                <ul className='flex flex-col gap-2'>{inactiveVenues.map(renderVenueRow)}</ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-export default AdminVenuesPage;

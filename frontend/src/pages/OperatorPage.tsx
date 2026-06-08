@@ -1,37 +1,9 @@
-/// <reference types="google.maps" />
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { formatStartTime } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
-
-// ── Google Maps script loader (singleton) ────────────────────────────────────
-let mapsScriptLoaded = false;
-let mapsScriptPromise: Promise<void> | null = null;
-
-function loadMapsScript(): Promise<void> {
-  if (mapsScriptLoaded) return Promise.resolve();
-  if (mapsScriptPromise) return mapsScriptPromise;
-  mapsScriptPromise = new Promise<void>((resolve, reject) => {
-    const callbackName = '__mapsReady_' + Date.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any)[callbackName] = () => {
-      mapsScriptLoaded = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (window as any)[callbackName];
-      resolve();
-    };
-    const script = document.createElement('script');
-    script.src =
-      `https://maps.googleapis.com/maps/api/js` +
-      `?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}` +
-      `&v=beta&libraries=places&callback=${callbackName}`;
-    script.async = true;
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
-    document.head.appendChild(script);
-  });
-  return mapsScriptPromise;
-}
+import VenueCreationForm, { type CreatedVenue } from '../components/VenueCreationForm';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,21 +79,6 @@ export default function OperatorPage() {
 
   // Venue creation modal
   const [showVenueModal, setShowVenueModal] = useState(false);
-  const [newVenueName, setNewVenueName] = useState('');
-  const [newVenueAddress, setNewVenueAddress] = useState('');
-  const [newVenueLat, setNewVenueLat] = useState<number | null>(null);
-  const [newVenueLng, setNewVenueLng] = useState<number | null>(null);
-  const [newVenueRadius, setNewVenueRadius] = useState(150);
-  const [creatingVenue, setCreatingVenue] = useState(false);
-  const [venueFormError, setVenueFormError] = useState<string | null>(null);
-  const [locatingUser, setLocatingUser] = useState(false);
-
-  // Google Maps Places autocomplete (venue modal)
-  const [newVenuePlaceSearch, setNewVenuePlaceSearch] = useState('');
-  const [predictions, setPredictions] = useState<google.maps.places.AutocompleteSuggestion[]>([]);
-  const [mapsReady, setMapsReady] = useState(false);
-  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Add room modal
   const [addRoomModal, setAddRoomModal] = useState<{
@@ -165,12 +122,6 @@ export default function OperatorPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load Google Maps script when venue modal opens
-  useEffect(() => {
-    if (!showVenueModal) return;
-    loadMapsScript().then(() => setMapsReady(true));
-  }, [showVenueModal]);
-
   // ── Venue combobox ────────────────────────────────────────────────────────
 
   const selectedVenue = venues.find(v => v.id === newEventVenueId);
@@ -190,108 +141,6 @@ export default function OperatorPage() {
       setVenueSearch('');
     }
     setVenueDropdownOpen(false);
-  }
-
-  // ── Venue creation modal — Places autocomplete ────────────────────────────
-
-  async function handleVenuePlaceSearch(input: string) {
-    setNewVenuePlaceSearch(input);
-    setPredictions([]);
-    if (!input.trim() || !mapsReady) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      if (!sessionTokenRef.current) {
-        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
-      }
-      try {
-        const { suggestions } =
-          await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-            input,
-            sessionToken: sessionTokenRef.current,
-          });
-        setPredictions(suggestions ?? []);
-      } catch (err) {
-        console.error('Autocomplete fetch error:', err);
-      }
-    }, 300);
-  }
-
-  async function handlePredictionSelect(suggestion: google.maps.places.AutocompleteSuggestion) {
-    if (!suggestion.placePrediction) return;
-    setPredictions([]);
-    const place = suggestion.placePrediction.toPlace();
-    try {
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
-      const display = place.displayName ?? '';
-      setNewVenuePlaceSearch(display);
-      setNewVenueName(display);
-      setNewVenueAddress(place.formattedAddress ?? '');
-      if (place.location) {
-        setNewVenueLat(place.location.lat());
-        setNewVenueLng(place.location.lng());
-      }
-      sessionTokenRef.current = null;
-    } catch (err) {
-      console.error('fetchFields error:', err);
-    }
-  }
-
-  function handleUseMyLocation() {
-    if (!navigator.geolocation) { setVenueFormError('Geolocation not supported by your browser'); return; }
-    setLocatingUser(true);
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setNewVenueLat(pos.coords.latitude);
-        setNewVenueLng(pos.coords.longitude);
-        setLocatingUser(false);
-        setVenueFormError(null);
-      },
-      () => {
-        setVenueFormError('Could not get your location — check browser permissions');
-        setLocatingUser(false);
-      }
-    );
-  }
-
-  async function handleCreateVenue(e: React.FormEvent) {
-    e.preventDefault();
-    setVenueFormError(null);
-    if (newVenueLat === null || newVenueLng === null) {
-      setVenueFormError('Search for a location or use your current location to set coordinates');
-      return;
-    }
-    setCreatingVenue(true);
-    try {
-      const res = await fetch('/api/venues', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newVenueName.trim(),
-          address: newVenueAddress || null,
-          lat: newVenueLat,
-          lng: newVenueLng,
-          geoFenceRadius: newVenueRadius,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setVenueFormError(data.error ?? 'Failed to create venue'); return; }
-      const newEntry = { id: data.id, name: data.name };
-      setVenues(prev => [...prev, newEntry].sort((a, b) => a.name.localeCompare(b.name)));
-      selectVenue(newEntry);
-      closeVenueModal();
-    } finally {
-      setCreatingVenue(false);
-    }
-  }
-
-  function closeVenueModal() {
-    setShowVenueModal(false);
-    setNewVenueName(''); setNewVenueAddress('');
-    setNewVenueLat(null); setNewVenueLng(null);
-    setNewVenueRadius(150);
-    setNewVenuePlaceSearch(''); setPredictions([]);
-    setVenueFormError(null);
   }
 
   // ── Create event ──────────────────────────────────────────────────────────
@@ -787,102 +636,19 @@ export default function OperatorPage() {
 
       {/* Venue creation modal */}
       {showVenueModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70' onClick={closeVenueModal}>
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70' onClick={() => setShowVenueModal(false)}>
           <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md' onClick={e => e.stopPropagation()}>
             <h2 className='text-white font-semibold mb-1'>Create venue</h2>
             <p className='text-xs text-gray-400 mb-4'>Search for the venue or use your current location</p>
-            <form onSubmit={handleCreateVenue} className='flex flex-col gap-3'>
-
-              {/* Google Places search */}
-              <div className='relative'>
-                <input
-                  type='text'
-                  value={newVenuePlaceSearch}
-                  onChange={e => handleVenuePlaceSearch(e.target.value)}
-                  placeholder={mapsReady ? 'Search for a venue (e.g. Fabric London)' : 'Loading search…'}
-                  disabled={!mapsReady}
-                  className={inputClass + ' disabled:opacity-50'}
-                />
-                {predictions.length > 0 && (
-                  <ul className='absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-xl'>
-                    {predictions.map((s, i) => (
-                      <li
-                        key={i}
-                        onMouseDown={e => { e.preventDefault(); handlePredictionSelect(s); }}
-                        className='px-4 py-3 cursor-pointer hover:bg-gray-700 border-b border-gray-700 last:border-b-0 transition-colors'
-                      >
-                        <p className='text-sm text-white font-medium'>{s.placePrediction?.mainText?.text}</p>
-                        {s.placePrediction?.secondaryText?.text && (
-                          <p className='text-xs text-gray-400 mt-0.5'>{s.placePrediction.secondaryText.text}</p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Use my location */}
-              <button
-                type='button'
-                onClick={handleUseMyLocation}
-                disabled={locatingUser}
-                className='flex items-center gap-2 text-sm text-accent hover:opacity-80 transition-opacity disabled:opacity-50 cursor-pointer w-fit'
-              >
-                <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
-                  <circle cx='12' cy='12' r='3'/><path d='M12 2v3M12 19v3M2 12h3M19 12h3'/>
-                </svg>
-                {locatingUser ? 'Getting location…' : 'Use my current location'}
-              </button>
-
-              {/* Resolved location */}
-              {newVenueLat !== null && newVenueLng !== null && (
-                <p className='text-xs text-gray-500'>
-                  📍 {newVenueAddress || `${newVenueLat.toFixed(5)}, ${newVenueLng.toFixed(5)}`}
-                </p>
-              )}
-
-              {/* Venue name — auto-filled by search, editable */}
-              <input
-                value={newVenueName}
-                onChange={e => setNewVenueName(e.target.value)}
-                placeholder='Venue name'
-                required
-                className={inputClass}
-              />
-
-              {/* Geofence radius */}
-              <div className='flex items-center gap-3'>
-                <label className='text-xs text-gray-400 shrink-0'>Geofence radius</label>
-                <input
-                  type='number'
-                  value={newVenueRadius}
-                  min={50}
-                  max={1000}
-                  onChange={e => setNewVenueRadius(Number(e.target.value))}
-                  className='w-24 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-accent transition-colors text-sm'
-                />
-                <span className='text-xs text-gray-500'>metres</span>
-              </div>
-
-              {venueFormError && <p className='text-red-400 text-sm'>{venueFormError}</p>}
-
-              <div className='flex gap-2 mt-1'>
-                <button
-                  type='submit'
-                  disabled={!newVenueName.trim() || newVenueLat === null || newVenueLng === null || creatingVenue}
-                  className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
-                >
-                  {creatingVenue ? 'Creating…' : 'Create venue'}
-                </button>
-                <button
-                  type='button'
-                  onClick={closeVenueModal}
-                  className='flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            <VenueCreationForm
+              onCreated={(venue: CreatedVenue) => {
+                const newEntry = { id: venue.id, name: venue.name };
+                setVenues(prev => [...prev, newEntry].sort((a, b) => a.name.localeCompare(b.name)));
+                selectVenue(newEntry);
+                setShowVenueModal(false);
+              }}
+              onCancel={() => setShowVenueModal(false)}
+            />
           </div>
         </div>
       )}
