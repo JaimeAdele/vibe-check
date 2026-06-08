@@ -124,9 +124,7 @@ export default function AdminVenuesPanel() {
               )}
             </p>
             {venue.address && <p className='text-xs text-gray-500 mt-0.5 truncate'>{venue.address}</p>}
-            <p className='text-xs text-gray-600 mt-0.5'>
-              {venue.geoFenceRadius}m radius · {venue.lat.toFixed(5)}, {venue.lng.toFixed(5)}
-            </p>
+            <p className='text-xs text-gray-600 mt-0.5'>{venue.geoFenceRadius}m radius</p>
           </div>
           <div className='flex items-center gap-2 shrink-0'>
             {venue.isActive ? (

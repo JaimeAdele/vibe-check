@@ -29,7 +29,7 @@ export default function VenueCreationForm({ onCreated, onCancel, submitLabel = '
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
-  const [radius, setRadius] = useState(150);
+  const [radius, setRadius] = useState(50);
   const [locating, setLocating] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -117,6 +117,7 @@ export default function VenueCreationForm({ onCreated, onCancel, submitLabel = '
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Failed to create venue'); return; }
+      setSearchQuery(''); setName(''); setAddress(''); setLat(null); setLng(null); setRadius(150);
       onCreated(data);
     } catch {
       setError('Failed to create venue. Please try again.');
@@ -129,12 +130,14 @@ export default function VenueCreationForm({ onCreated, onCancel, submitLabel = '
     <form onSubmit={handleSubmit} className='flex flex-col gap-3'>
 
       {/* Location search */}
+      <div>
+      <label className='block text-xs text-gray-500 mb-1'>Location</label>
       <div className='relative'>
         <input
           type='text'
           value={searchQuery}
           onChange={e => handleSearch(e.target.value)}
-          placeholder={mapsReady ? 'Search for a venue (e.g. Fabric London)' : 'Loading search…'}
+          placeholder={mapsReady ? 'Search for a venue (e.g. Dance USA)' : 'Loading search…'}
           disabled={!mapsReady}
           className={inputClass + ' disabled:opacity-50'}
         />
@@ -154,6 +157,7 @@ export default function VenueCreationForm({ onCreated, onCancel, submitLabel = '
             ))}
           </ul>
         )}
+      </div>
       </div>
 
       {/* Use my current location */}
@@ -177,12 +181,15 @@ export default function VenueCreationForm({ onCreated, onCancel, submitLabel = '
       )}
 
       {/* Venue name — auto-filled by search, always editable */}
-      <input
-        value={name}
-        onChange={e => setName(e.target.value)}
-        placeholder='Venue name'
-        className={inputClass}
-      />
+      <div>
+        <label className='block text-xs text-gray-500 mb-1'>Name</label>
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder='Venue name'
+          className={inputClass}
+        />
+      </div>
 
       {/* Geofence radius */}
       <div className='flex items-center gap-3'>
