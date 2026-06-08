@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import AdminVenuesPanel from '../components/AdminVenuesPage';
 
 interface Operator {
   id: string;
@@ -16,10 +17,13 @@ function toSlug(value: string) {
 
 const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-base sm:text-sm';
 
+type Tab = 'operators' | 'venues';
+
 export default function AdminPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [tab, setTab] = useState<Tab>('operators');
   const [operators, setOperators] = useState<Operator[]>([]);
 
   // Create form
@@ -131,8 +135,28 @@ export default function AdminPage() {
   }
 
   return (
-    <Layout title='Admin' subtitle='Manage operators' backTo='/'>
+    <Layout title='Admin' subtitle={tab === 'operators' ? 'Manage operators' : 'Manage venues'} backTo='/'>
 
+      {/* Tab bar */}
+      <div className='flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1 mb-8'>
+        {(['operators', 'venues'] as Tab[]).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer capitalize ${
+              tab === t
+                ? 'bg-gray-700 text-white'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'venues' && <AdminVenuesPanel />}
+
+      {tab === 'operators' && <>
       {/* Create operator form */}
       <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8'>
         <h2 className='text-white font-semibold mb-4'>Create operator account</h2>
@@ -270,6 +294,7 @@ export default function AdminPage() {
           ))}
         </ul>
       )}
+      </>}
 
     </Layout>
   );
