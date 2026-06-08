@@ -145,6 +145,7 @@ export default function OperatorPage() {
   const isPagePrivileged = operator !== null && (
     user?.userId === operator.id || user?.role === 'ADMIN'
   );
+  const isOwner = operator !== null && user?.userId === operator.id;
 
   useEffect(() => {
     if (isPagePrivileged) {
@@ -593,7 +594,7 @@ export default function OperatorPage() {
     <>
       <Layout title={operator.name} subtitle='Events' backTo='/'>
 
-        {isPagePrivileged && (
+        {isOwner && (
           <div className='mb-8'>
             {showCreateEvent ? (
               <form onSubmit={handleCreateEvent} className='bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col gap-3'>
