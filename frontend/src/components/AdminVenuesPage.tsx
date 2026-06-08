@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import VenueCreationForm, { type CreatedVenue } from './VenueCreationForm';
 
 interface Venue {
   id: string;
@@ -16,15 +17,6 @@ export default function AdminVenuesPanel() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
-
-  // Create form
-  const [createName, setCreateName] = useState('');
-  const [createAddress, setCreateAddress] = useState('');
-  const [createLat, setCreateLat] = useState('');
-  const [createLng, setCreateLng] = useState('');
-  const [createRadius, setCreateRadius] = useState(150);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,42 +38,8 @@ export default function AdminVenuesPanel() {
       .catch(() => setLoading(false));
   }, []);
 
-  async function handleCreate(e: { preventDefault(): void }) {
-    e.preventDefault();
-    const lat = parseFloat(createLat);
-    const lng = parseFloat(createLng);
-
-    if (!createName.trim()) { setCreateError('Name is required.'); return; }
-    if (isNaN(lat) || isNaN(lng)) { setCreateError('Latitude and longitude must be valid numbers.'); return; }
-
-    setCreating(true);
-    setCreateError('');
-    try {
-      const res = await fetch('/api/venues', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: createName.trim(),
-          address: createAddress.trim() || null,
-          lat,
-          lng,
-          geoFenceRadius: createRadius,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setCreateError(data.error ?? 'Failed to create venue.');
-        return;
-      }
-      const venue: Venue = await res.json();
-      setVenues(prev => [...prev, venue].sort((a, b) => a.name.localeCompare(b.name)));
-      setCreateName(''); setCreateAddress(''); setCreateLat(''); setCreateLng(''); setCreateRadius(150);
-    } catch {
-      setCreateError('Failed to create venue. Please try again.');
-    } finally {
-      setCreating(false);
-    }
+  function handleVenueCreated(venue: CreatedVenue) {
+    setVenues(prev => [...prev, venue].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
   function startEdit(venue: Venue) {
@@ -240,43 +198,11 @@ export default function AdminVenuesPanel() {
 
   return (
     <div className='flex flex-col gap-8'>
-      {/* Create venue form */}
+
+      {/* Create venue */}
       <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6'>
         <h2 className='text-white font-semibold mb-4'>Add a venue</h2>
-        <form onSubmit={handleCreate} className='flex flex-col gap-3'>
-          <input value={createName} onChange={e => setCreateName(e.target.value)} placeholder='Venue name' className={inputClass} />
-          <input value={createAddress} onChange={e => setCreateAddress(e.target.value)} placeholder='Address (optional)' className={inputClass} />
-          <div className='flex gap-3'>
-            <div className='flex-1'>
-              <label className='block text-xs text-gray-500 mb-1'>Latitude</label>
-              <input value={createLat} onChange={e => setCreateLat(e.target.value)} placeholder='e.g. 51.53320' className={`${inputClass} font-mono`} />
-            </div>
-            <div className='flex-1'>
-              <label className='block text-xs text-gray-500 mb-1'>Longitude</label>
-              <input value={createLng} onChange={e => setCreateLng(e.target.value)} placeholder='e.g. -0.07624' className={`${inputClass} font-mono`} />
-            </div>
-          </div>
-          <div className='flex items-center gap-3'>
-            <label className='text-xs text-gray-400 shrink-0'>Geofence radius</label>
-            <input
-              type='number'
-              value={createRadius}
-              min={50}
-              max={1000}
-              onChange={e => setCreateRadius(Number(e.target.value))}
-              className='w-24 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-accent transition-colors text-sm'
-            />
-            <span className='text-xs text-gray-500'>metres</span>
-          </div>
-          {createError && <p className='text-red-400 text-xs'>{createError}</p>}
-          <button
-            type='submit'
-            disabled={creating}
-            className='w-full bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm cursor-pointer'
-          >
-            {creating ? 'Adding…' : 'Add venue'}
-          </button>
-        </form>
+        <VenueCreationForm onCreated={handleVenueCreated} submitLabel='Add venue' />
       </div>
 
       {/* Venue list */}
