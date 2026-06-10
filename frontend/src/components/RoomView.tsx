@@ -44,7 +44,7 @@ interface Event {
   id: string;
   name: string;
   startTime: string;
-  operatorId: string;
+  organizerId: string;
   venue: VenueSummary | null;
 }
 

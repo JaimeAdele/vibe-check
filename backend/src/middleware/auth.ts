@@ -31,7 +31,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-// Master admin only — manages operator accounts
+// Master admin only — manages organizer accounts
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== 'ADMIN') {
     res.status(403).json({ error: 'Admin access required' });
@@ -40,19 +40,19 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Operator only — runs events and venues
-export function requireOperator(req: Request, res: Response, next: NextFunction) {
-  if (req.user?.role !== 'OPERATOR') {
-    res.status(403).json({ error: 'Operator access required' });
+// Organizer only — runs events and venues
+export function requireOrganizer(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role !== 'ORGANIZER') {
+    res.status(403).json({ error: 'Organizer access required' });
     return;
   }
   next();
 }
 
-// Operator or master Admin
+// Organizer or master Admin
 export function requirePrivileged(req: Request, res: Response, next: NextFunction) {
-  if (req.user?.role !== 'OPERATOR' && req.user?.role !== 'ADMIN') {
-    res.status(403).json({ error: 'Operator or admin access required' });
+  if (req.user?.role !== 'ORGANIZER' && req.user?.role !== 'ADMIN') {
+    res.status(403).json({ error: 'Organizer or admin access required' });
     return;
   }
   next();

@@ -21,7 +21,7 @@ router.get('/:roomCode/setlist', optionalAuth, async (req: Request, res: Respons
             id: true,
             name: true,
             startTime: true,
-            operatorId: true,
+            organizerId: true,
             venue: { select: { id: true, name: true, address: true } },
           },
         },
@@ -37,7 +37,7 @@ router.get('/:roomCode/setlist', optionalAuth, async (req: Request, res: Respons
     const userId = req.user?.userId;
     const isPrivileged = !!(userId && (
       req.user?.role === 'ADMIN' ||
-      room.event.operatorId === userId ||
+      room.event.organizerId === userId ||
       room.djs.some(dj => dj.userId === userId)
     ));
 

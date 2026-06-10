@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 export interface AuthUser {
   userId: string;
-  role: 'USER' | 'OPERATOR' | 'ADMIN';
+  role: 'USER' | 'ORGANIZER' | 'ADMIN';
 }
 
 interface AuthContextType {
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
-  const isPrivileged = user?.role === 'OPERATOR' || user?.role === 'ADMIN';
+  const isPrivileged = user?.role === 'ORGANIZER' || user?.role === 'ADMIN';
 
   async function login(email: string, password: string): Promise<{ slug: string | null; role: string } | null> {
     const res = await fetch('/api/auth/login', {

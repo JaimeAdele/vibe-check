@@ -10,7 +10,7 @@ import roomsRouter from './routes/rooms';
 import spotifyRouter from './routes/spotify';
 import venuesRouter from './routes/venues';
 import songsRouter from './routes/songs';
-import operatorsRouter from './routes/operators';
+import organizersRouter from './routes/organizers';
 
 const app = express();
 
@@ -55,7 +55,7 @@ app.use('/api/rooms/:id/identify', identifyRouter);
 app.use('/api/spotify', spotifyRouter);
 app.use('/api/venues', venuesRouter);
 app.use('/api/songs', songsRouter);
-app.use('/api/operators', operatorsRouter);
+app.use('/api/organizers', organizersRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (_req, res) => {

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { getIO } from '../lib/socket';
-import { requireAuth, requireOperator, requirePrivileged } from '../middleware/auth';
+import { requireAuth, requireOrganizer, requirePrivileged } from '../middleware/auth';
 
 const router = Router();
 
@@ -11,7 +11,7 @@ function generateRoomCode(): string {
 
 // POST /api/events — create an event (operator only)
 // Accepts optional `rooms: string[]`; defaults to one room named after the event.
-router.post('/', requireAuth, requireOperator, async (req: Request, res: Response) => {
+router.post('/', requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   const { name, startTime, venueId, rooms: roomNames, recurrenceFrequency, recurrenceDayOfWeek, recurrenceDayPosition } = req.body;
 
   if (!name || typeof name !== 'string') {
@@ -28,7 +28,7 @@ router.post('/', requireAuth, requireOperator, async (req: Request, res: Respons
       data: {
         name,
         startTime: new Date(startTime),
-        operatorId: req.user!.userId,
+        organizerId: req.user!.userId,
         venueId: venueId ?? null,
         recurrenceFrequency: recurrenceFrequency ?? null,
         recurrenceDayOfWeek: recurrenceDayOfWeek ?? null,
@@ -77,7 +77,7 @@ router.patch('/:id/startTime', requireAuth, requirePrivileged, async (req: Reque
   try {
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) { res.status(404).json({ error: 'Event not found' }); return; }
-    if (req.user!.role !== 'ADMIN' && event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -103,7 +103,7 @@ router.patch('/:id/venue', requireAuth, requirePrivileged, async (req: Request, 
   try {
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) { res.status(404).json({ error: 'Event not found' }); return; }
-    if (req.user!.role !== 'ADMIN' && event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -123,7 +123,7 @@ router.delete('/:id', requireAuth, requirePrivileged, async (req: Request, res: 
   try {
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) { res.status(404).json({ error: 'Event not found' }); return; }
-    if (req.user!.role !== 'ADMIN' && event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -146,7 +146,7 @@ router.post('/:id/rooms', requireAuth, requirePrivileged, async (req: Request, r
   try {
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) { res.status(404).json({ error: 'Event not found' }); return; }
-    if (req.user!.role !== 'ADMIN' && event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -171,12 +171,12 @@ router.patch('/:id/rooms/:roomId/status', requireAuth, requirePrivileged, async 
   try {
     const room = await prisma.room.findUnique({
       where: { id: req.params.roomId },
-      include: { event: { select: { operatorId: true } } },
+      include: { event: { select: { organizerId: true } } },
     });
     if (!room || room.eventId !== req.params.id) {
       res.status(404).json({ error: 'Room not found' }); return;
     }
-    if (req.user!.role !== 'ADMIN' && room.event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && room.event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -202,12 +202,12 @@ router.patch('/:id/rooms/:roomId', requireAuth, requirePrivileged, async (req: R
   try {
     const room = await prisma.room.findUnique({
       where: { id: req.params.roomId },
-      include: { event: { select: { operatorId: true } } },
+      include: { event: { select: { organizerId: true } } },
     });
     if (!room || room.eventId !== req.params.id) {
       res.status(404).json({ error: 'Room not found' }); return;
     }
-    if (req.user!.role !== 'ADMIN' && room.event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && room.event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -226,12 +226,12 @@ router.delete('/:id/rooms/:roomId', requireAuth, requirePrivileged, async (req: 
   try {
     const room = await prisma.room.findUnique({
       where: { id: req.params.roomId },
-      include: { event: { select: { operatorId: true } } },
+      include: { event: { select: { organizerId: true } } },
     });
     if (!room || room.eventId !== req.params.id) {
       res.status(404).json({ error: 'Room not found' }); return;
     }
-    if (req.user!.role !== 'ADMIN' && room.event.operatorId !== req.user!.userId) {
+    if (req.user!.role !== 'ADMIN' && room.event.organizerId !== req.user!.userId) {
       res.status(403).json({ error: 'Not authorized' }); return;
     }
 
@@ -255,7 +255,7 @@ router.post('/:id/rooms/:roomId/songs', requireAuth, async (req: Request, res: R
     const room = await prisma.room.findUnique({
       where: { id: req.params.roomId },
       include: {
-        event: { select: { operatorId: true } },
+        event: { select: { organizerId: true } },
         djs: { select: { userId: true } },
       },
     });
@@ -267,7 +267,7 @@ router.post('/:id/rooms/:roomId/songs', requireAuth, async (req: Request, res: R
     const userRole = req.user!.role;
     const canAdd =
       userRole === 'ADMIN' ||
-      room.event.operatorId === userId ||
+      room.event.organizerId === userId ||
       room.djs.some(dj => dj.userId === userId);
 
     if (!canAdd) { res.status(403).json({ error: 'Not authorized' }); return; }
@@ -299,7 +299,7 @@ router.delete('/:id/rooms/:roomId/songs/:songId', requireAuth, async (req: Reque
     const room = await prisma.room.findUnique({
       where: { id: req.params.roomId },
       include: {
-        event: { select: { operatorId: true } },
+        event: { select: { organizerId: true } },
         djs: { select: { userId: true } },
       },
     });
@@ -311,7 +311,7 @@ router.delete('/:id/rooms/:roomId/songs/:songId', requireAuth, async (req: Reque
     const userRole = req.user!.role;
     const canDelete =
       userRole === 'ADMIN' ||
-      room.event.operatorId === userId ||
+      room.event.organizerId === userId ||
       room.djs.some(dj => dj.userId === userId);
 
     if (!canDelete) { res.status(403).json({ error: 'Not authorized' }); return; }

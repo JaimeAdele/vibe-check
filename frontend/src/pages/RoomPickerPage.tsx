@@ -33,11 +33,11 @@ export default function RoomPickerPage() {
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/operators/${slug}`)
+    fetch(`/api/organizers/${slug}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) { setNotFound(true); return; }
-        const found = data.operator.events.find((e: Event) => e.id === eventId);
+        const found = data.organizer.events.find((e: Event) => e.id === eventId);
         if (!found) { setNotFound(true); return; }
         setEvent(found);
       })

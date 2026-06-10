@@ -17,14 +17,14 @@ model User {
   googleId      String?  @unique
   role          UserRole @default(USER)
   createdAt     DateTime @default(now())
-  events        Event[]  @relation("OperatorEvents")
+  events        Event[]  @relation("OrganizerEvents")
   createdVenues Venue[]  @relation("VenueCreator")
   djAssignments RoomDJ[]
 }
 
 enum UserRole {
   USER
-  OPERATOR
+  ORGANIZER
   ADMIN
 }
 
@@ -46,12 +46,12 @@ model Event {
   name                 String
   startTime            DateTime
   createdAt            DateTime            @default(now())
-  operatorId           String
+  organizerId          String
   venueId              String?
   recurrenceFrequency  RecurrenceFrequency?
   recurrenceDayOfWeek  Int?
   recurrenceDayPosition Int?
-  operator             User                @relation("OperatorEvents", fields: [operatorId], references: [id])
+  organizer            User                @relation("OrganizerEvents", fields: [organizerId], references: [id])
   venue                Venue?              @relation(fields: [venueId], references: [id])
   rooms                Room[]
 }

@@ -1,6 +1,6 @@
 # Vibe Check
 
-A real-time, multi-tenant DJ set song identification platform. Each Operator (DJ collective, promoter, venue) has their own public URL slug, event list, and rooms. Attendees at a live event can identify the song currently playing, rate tracks, and submit song requests — all updating live on every connected device. Operators can manage their events and rooms from a privileged dashboard.
+A real-time, multi-tenant DJ set song identification platform. Each Organizer (DJ collective, promoter, venue) has their own public URL slug, event list, and rooms. Attendees at a live event can identify the song currently playing, rate tracks, and submit song requests — all updating live on every connected device. Organizers can manage their events and rooms from a privileged dashboard.
 
 ---
 
@@ -9,14 +9,15 @@ A real-time, multi-tenant DJ set song identification platform. Each Operator (DJ
 - 🎵 **Song identification** — a user holds up their phone, records a short audio clip, and the app identifies the song via ACRCloud audio fingerprinting
 - 🎧 **Live setlist** — identified songs appear on every connected device in real time via WebSockets
 - ⭐ **Ratings & requests** — attendees can rate songs and request tracks; requests are sorted by votes
-- 🔒 **Role-based access** — Google OAuth login; Operators and assigned DJs can add/remove songs; master Admins manage operator accounts
+- 🔒 **Role-based access** — Google OAuth login; Organizers and assigned DJs can add/remove songs; master Admins manage organizer accounts
 - 🔁 **Duplicate detection** — if the same song is identified twice in a row, it is skipped and the user sees an "Already playing" message instead of a duplicate entry
 - 📍 **Venues & geofencing** — events can be linked to a venue; regular users must be within the venue's geofence radius to identify songs (checked on every tap, not just room entry)
 - 🏟️ **Venue management** — admins can edit any venue's name, address, coordinates, and geofence radius; deleting a venue soft-deletes it (the row stays in the database so linked events are unaffected) and removes it from the event-creation dropdown; deleted venues can be restored
 - 🔥 **Song reactions** — attendees react to each song with 🔥 ❤️ 🥱 🤮 (no login required); reactions are tied to a server-issued anonymous voter cookie; one reaction per song per browser; reactions are only open for 15 minutes after a song is identified; vibe scores update live on all connected devices via Socket.io
-- 🏢 **Multi-tenant operator platform** — each Operator (DJ collective, promoter, venue brand) gets a unique slug and public URL; their events and rooms are scoped to them
-- 🚪 **Single and multi-room events** — operators choose at creation time: single-room events drop attendees directly into the room; multi-room events show inline room buttons so attendees pick their room without a separate page
-- ✏️ **Room management** — operators can rename rooms and add new rooms to an existing event from the operator dashboard
+- 🏢 **Multi-tenant organizer platform** — each Organizer (DJ collective, promoter, venue brand) gets a unique slug and public URL; their events and rooms are scoped to them
+- 🚪 **Single and multi-room events** — organizers choose at creation time: single-room events drop attendees directly into the room; multi-room events show inline room buttons so attendees pick their room without a separate page
+- ✏️ **Room management** — organizers can rename rooms and add new rooms to an existing event from the organizer dashboard
+- 🔁 **Recurring events** — organizers can mark an event as repeating (weekly, biweekly, or monthly); a "Schedule next" button auto-fills the next occurrence date, name, venue, and room names into the create form
 
 ---
 
@@ -172,21 +173,21 @@ All routes are prefixed with `/api`.
 | `GET` | `/auth/me` | cookie | Get current user |
 | `POST` | `/auth/logout` | — | Clear session cookie |
 | `GET` | `/auth/google` | — | Initiate Google OAuth |
-| `POST` | `/auth/register-operator` | Admin | Create an Operator account with slug |
-| `GET` | `/operators` | — | List all operators with active event counts |
-| `GET` | `/operators/:slug` | — | Operator profile + events + rooms |
-| `PATCH` | `/operators/:id` | Admin | Edit operator name or slug |
-| `POST` | `/events` | Operator | Create an event |
-| `PATCH` | `/events/:id/startTime` | Operator/Admin | Update event start time |
-| `PATCH` | `/events/:id/venue` | Operator/Admin | Assign or clear the event venue |
-| `DELETE` | `/events/:id` | Operator/Admin | Delete event (ownership check) |
-| `POST` | `/events/:id/rooms` | Operator/Admin | Create a room within the event |
-| `PATCH` | `/events/:id/rooms/:roomId` | Operator/Admin | Rename a room |
-| `PATCH` | `/events/:id/rooms/:roomId/status` | Operator/Admin | Update room status (broadcasts via socket) |
-| `DELETE` | `/events/:id/rooms/:roomId` | Operator/Admin | Delete a room |
+| `POST` | `/auth/register-operator` | Admin | Create an Organizer account with slug |
+| `GET` | `/organizers` | — | List all organizers with active event counts |
+| `GET` | `/organizers/:slug` | — | Organizer profile + events + rooms |
+| `PATCH` | `/organizers/:id` | Admin | Edit organizer name or slug |
+| `POST` | `/events` | Organizer | Create an event |
+| `PATCH` | `/events/:id/startTime` | Organizer/Admin | Update event start time |
+| `PATCH` | `/events/:id/venue` | Organizer/Admin | Assign or clear the event venue |
+| `DELETE` | `/events/:id` | Organizer/Admin | Delete event (ownership check) |
+| `POST` | `/events/:id/rooms` | Organizer/Admin | Create a room within the event |
+| `PATCH` | `/events/:id/rooms/:roomId` | Organizer/Admin | Rename a room |
+| `PATCH` | `/events/:id/rooms/:roomId/status` | Organizer/Admin | Update room status (broadcasts via socket) |
+| `DELETE` | `/events/:id/rooms/:roomId` | Organizer/Admin | Delete a room |
 | `GET` | `/rooms/:roomCode/setlist` | — | Room setlist + event info + `isPrivileged` flag |
-| `POST` | `/events/:id/rooms/:roomId/songs` | Operator/DJ | Add a song |
-| `DELETE` | `/events/:id/rooms/:roomId/songs/:songId` | Operator/DJ | Remove a song |
+| `POST` | `/events/:id/rooms/:roomId/songs` | Organizer/DJ | Add a song |
+| `DELETE` | `/events/:id/rooms/:roomId/songs/:songId` | Organizer/DJ | Remove a song |
 | `POST` | `/rooms/:roomCode/identify/lock` | — | Acquire identification lock |
 | `DELETE` | `/rooms/:roomCode/identify/lock` | — | Release identification lock |
 | `POST` | `/rooms/:roomCode/identify` | — | Submit audio for song identification |

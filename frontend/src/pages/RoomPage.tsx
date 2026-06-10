@@ -27,7 +27,7 @@ interface SetlistData {
     id: string;
     name: string;
     startTime: string;
-    operatorId: string;
+    organizerId: string;
     venue: { id: string; name: string; address: string | null } | null;
   };
   songs: Song[];

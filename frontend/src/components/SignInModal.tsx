@@ -19,7 +19,7 @@ export default function SignInModal({ onClose }: Props) {
     const result = await login(email, password);
     if (result) {
       onClose();
-      if (result.role === 'OPERATOR' && result.slug) navigate(`/${result.slug}`);
+      if (result.role === 'ORGANIZER' && result.slug) navigate(`/${result.slug}`);
       else if (result.role === 'ADMIN') navigate('/admin');
     } else {
       setError(true);

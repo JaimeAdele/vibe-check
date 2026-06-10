@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import AdminVenuesPanel from '../components/AdminVenuesPage';
 
-interface Operator {
+interface Organizer {
   id: string;
   name: string;
   slug: string;
@@ -17,14 +17,14 @@ function toSlug(value: string) {
 
 const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-base sm:text-sm';
 
-type Tab = 'operators' | 'venues';
+type Tab = 'organizers' | 'venues';
 
 export default function AdminPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>('operators');
-  const [operators, setOperators] = useState<Operator[]>([]);
+  const [tab, setTab] = useState<Tab>('organizers');
+  const [organizers, setOrganizers] = useState<Organizer[]>([]);
 
   // Create form
   const [name, setName] = useState('');
@@ -50,9 +50,9 @@ export default function AdminPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    fetch('/api/operators')
+    fetch('/api/organizers')
       .then(r => r.json())
-      .then(data => setOperators(data.operators ?? []));
+      .then(data => setOrganizers(data.organizers ?? []));
   }, []);
 
   function handleNameChange(value: string) {
@@ -82,18 +82,18 @@ export default function AdminPage() {
 
       if (!res.ok) { setCreateError(data.error ?? 'Something went wrong'); return; }
 
-      setCreateSuccess(`Operator "${data.name}" created — /${data.slug}`);
-      setOperators(prev => [...prev, { id: data.id, name: data.name, slug: data.slug, activeEventCount: 0 }]);
+      setCreateSuccess(`Organizer "${data.name}" created — /${data.slug}`);
+      setOrganizers(prev => [...prev, { id: data.id, name: data.name, slug: data.slug, activeEventCount: 0 }]);
       setName(''); setSlug(''); setSlugEdited(false); setEmail(''); setPassword('');
     } finally {
       setCreating(false);
     }
   }
 
-  function startEdit(op: Operator) {
-    setEditingId(op.id);
-    setEditName(op.name);
-    setEditSlug(op.slug ?? '');
+  function startEdit(org: Organizer) {
+    setEditingId(org.id);
+    setEditName(org.name);
+    setEditSlug(org.slug ?? '');
     setEditEmail('');
     setEditPassword('');
     setEditError(null);
@@ -104,18 +104,18 @@ export default function AdminPage() {
     setEditError(null);
   }
 
-  async function handleSave(op: Operator) {
+  async function handleSave(org: Organizer) {
     setSaving(true);
     setEditError(null);
 
     try {
       const body: Record<string, string> = {};
-      if (editName !== op.name) body.name = editName;
-      if (editSlug !== op.slug) body.slug = editSlug;
+      if (editName !== org.name) body.name = editName;
+      if (editSlug !== org.slug) body.slug = editSlug;
       if (editEmail) body.email = editEmail;
       if (editPassword) body.password = editPassword;
 
-      const res = await fetch(`/api/operators/${op.id}`, {
+      const res = await fetch(`/api/organizers/${org.id}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -125,8 +125,8 @@ export default function AdminPage() {
 
       if (!res.ok) { setEditError(data.error ?? 'Something went wrong'); return; }
 
-      setOperators(prev => prev.map(o =>
-        o.id === op.id ? { ...o, name: data.name, slug: data.slug } : o
+      setOrganizers(prev => prev.map(o =>
+        o.id === org.id ? { ...o, name: data.name, slug: data.slug } : o
       ));
       setEditingId(null);
     } finally {
@@ -135,11 +135,11 @@ export default function AdminPage() {
   }
 
   return (
-    <Layout title='Admin' subtitle={tab === 'operators' ? 'Manage operators' : 'Manage venues'} backTo='/'>
+    <Layout title='Admin' subtitle={tab === 'organizers' ? 'Manage organizers' : 'Manage venues'} backTo='/'>
 
       {/* Tab bar */}
       <div className='flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1 mb-8'>
-        {(['operators', 'venues'] as Tab[]).map(t => (
+        {(['organizers', 'venues'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -156,10 +156,10 @@ export default function AdminPage() {
 
       {tab === 'venues' && <AdminVenuesPanel />}
 
-      {tab === 'operators' && <>
-      {/* Create operator form */}
+      {tab === 'organizers' && <>
+      {/* Create organizer form */}
       <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8'>
-        <h2 className='text-white font-semibold mb-4'>Create operator account</h2>
+        <h2 className='text-white font-semibold mb-4'>Create organizer account</h2>
         <form onSubmit={handleCreate} className='flex flex-col gap-3'>
           <input
             value={name}
@@ -197,24 +197,24 @@ export default function AdminPage() {
             disabled={!name.trim() || !slug.trim() || !email.trim() || !password.trim() || creating}
             className='w-full bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm cursor-pointer'
           >
-            {creating ? 'Creating…' : 'Create operator'}
+            {creating ? 'Creating…' : 'Create organizer'}
           </button>
           {createError && <p className='text-red-400 text-sm'>{createError}</p>}
           {createSuccess && <p className='text-green-400 text-sm'>{createSuccess}</p>}
         </form>
       </div>
 
-      {/* Operator list */}
+      {/* Organizer list */}
       <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4'>
-        All operators
+        All organizers
       </h2>
-      {operators.length === 0 ? (
-        <p className='text-gray-600 text-sm text-center py-8'>No operators yet</p>
+      {organizers.length === 0 ? (
+        <p className='text-gray-600 text-sm text-center py-8'>No organizers yet</p>
       ) : (
         <ul className='flex flex-col gap-3'>
-          {operators.map(op => (
-            <li key={op.id}>
-              {editingId === op.id ? (
+          {organizers.map(org => (
+            <li key={org.id}>
+              {editingId === org.id ? (
                 /* Edit form */
                 <div className='bg-gray-900 border border-accent/40 rounded-xl px-5 py-4'>
                   <div className='flex flex-col gap-3'>
@@ -250,7 +250,7 @@ export default function AdminPage() {
                     {editError && <p className='text-red-400 text-sm'>{editError}</p>}
                     <div className='flex gap-2'>
                       <button
-                        onClick={() => handleSave(op)}
+                        onClick={() => handleSave(org)}
                         disabled={saving || !editName.trim() || !editSlug.trim()}
                         className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
                       >
@@ -266,23 +266,23 @@ export default function AdminPage() {
                   </div>
                 </div>
               ) : (
-                /* Operator card */
+                /* Organizer card */
                 <div className='flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-5 py-4'>
                   <button
-                    onClick={() => navigate(`/${op.slug}`)}
+                    onClick={() => navigate(`/${org.slug}`)}
                     className='flex-1 text-left'
                   >
-                    <p className='text-white font-medium'>{op.name}</p>
-                    <p className='text-gray-500 text-xs mt-0.5'>/{op.slug}</p>
+                    <p className='text-white font-medium'>{org.name}</p>
+                    <p className='text-gray-500 text-xs mt-0.5'>/{org.slug}</p>
                   </button>
                   <div className='flex items-center gap-2 shrink-0 ml-3'>
-                    {op.activeEventCount > 0 && (
+                    {org.activeEventCount > 0 && (
                       <span className='text-xs font-medium bg-green-500/15 text-green-400 px-2.5 py-1 rounded-full'>
-                        {op.activeEventCount} {op.activeEventCount === 1 ? 'event' : 'events'}
+                        {org.activeEventCount} {org.activeEventCount === 1 ? 'event' : 'events'}
                       </span>
                     )}
                     <button
-                      onClick={() => startEdit(op)}
+                      onClick={() => startEdit(org)}
                       className='text-xs text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer'
                     >
                       Edit

@@ -8,10 +8,10 @@ const SLUG_PATTERN = /^[a-z0-9-]{3,40}$/;
 
 const router = Router();
 
-// GET /api/operators — public; list all operators with active event count
+// GET /api/organizers — public; list all organizers with active event count
 router.get('/', async (_req, res) => {
-  const operators = await prisma.user.findMany({
-    where: { role: 'OPERATOR' },
+  const organizers = await prisma.user.findMany({
+    where: { role: 'ORGANIZER' },
     select: {
       id: true,
       name: true,
@@ -24,21 +24,21 @@ router.get('/', async (_req, res) => {
     orderBy: { name: 'asc' },
   });
 
-  const result = operators.map((op) => ({
-    id: op.id,
-    name: op.name,
-    slug: op.slug,
-    activeEventCount: op.events.length,
+  const result = organizers.map((org) => ({
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    activeEventCount: org.events.length,
   }));
 
-  res.json({ operators: result });
+  res.json({ organizers: result });
 });
 
-// GET /api/operators/:slug — public; operator info + their events with rooms
+// GET /api/organizers/:slug — public; organizer info + their events with rooms
 router.get('/:slug', async (req, res) => {
   const { slug } = req.params;
 
-  const operator = await prisma.user.findUnique({
+  const organizer = await prisma.user.findUnique({
     where: { slug },
     select: {
       id: true,
@@ -71,15 +71,15 @@ router.get('/:slug', async (req, res) => {
     },
   });
 
-  if (!operator) {
-    res.status(404).json({ error: 'Operator not found' });
+  if (!organizer) {
+    res.status(404).json({ error: 'Organizer not found' });
     return;
   }
 
-  res.json({ operator });
+  res.json({ organizer });
 });
 
-// PATCH /api/operators/:id — admin only; edit operator account fields
+// PATCH /api/organizers/:id — admin only; edit organizer account fields
 router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, email, slug, password } = req.body;

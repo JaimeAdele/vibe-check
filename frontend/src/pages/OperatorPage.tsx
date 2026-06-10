@@ -31,7 +31,7 @@ interface Event {
   recurrenceDayPosition: number | null;
 }
 
-interface Operator {
+interface Organizer {
   id: string;
   name: string;
   slug: string;
@@ -123,7 +123,7 @@ export default function OperatorPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [operator, setOperator] = useState<Operator | null>(null);
+  const [organizer, setOrganizer] = useState<Organizer | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -163,16 +163,16 @@ export default function OperatorPage() {
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | null>(null);
 
   useEffect(() => {
-    fetch(`/api/operators/${slug}`)
+    fetch(`/api/organizers/${slug}`)
       .then(r => { if (!r.ok) { setNotFound(true); return null; } return r.json(); })
-      .then(data => { if (data) setOperator(data.operator); })
+      .then(data => { if (data) setOrganizer(data.organizer); })
       .finally(() => setLoading(false));
   }, [slug]);
 
-  const isPagePrivileged = operator !== null && (
-    user?.userId === operator.id || user?.role === 'ADMIN'
+  const isPagePrivileged = organizer !== null && (
+    user?.userId === organizer.id || user?.role === 'ADMIN'
   );
-  const isOwner = operator !== null && user?.userId === operator.id;
+  const isOwner = organizer !== null && user?.userId === organizer.id;
 
   useEffect(() => {
     if (isPagePrivileged) {
@@ -252,7 +252,7 @@ export default function OperatorPage() {
       });
       if (!res.ok) return;
       const event = await res.json();
-      setOperator(prev => prev ? { ...prev, events: [event, ...prev.events] } : prev);
+      setOrganizer(prev => prev ? { ...prev, events: [event, ...prev.events] } : prev);
       resetCreateEventForm();
     } finally {
       setCreatingEvent(false);
@@ -288,7 +288,7 @@ export default function OperatorPage() {
     e.stopPropagation();
     if (!window.confirm('Delete this event and all its rooms? This cannot be undone.')) return;
     const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
-    if (res.ok) setOperator(prev => prev ? { ...prev, events: prev.events.filter(ev => ev.id !== eventId) } : prev);
+    if (res.ok) setOrganizer(prev => prev ? { ...prev, events: prev.events.filter(ev => ev.id !== eventId) } : prev);
   }
 
   // ── Add room modal ────────────────────────────────────────────────────────
@@ -313,7 +313,7 @@ export default function OperatorPage() {
     try {
       const { eventId, existingRoom } = addRoomModal;
 
-      // Rename the existing room if the operator changed the name
+      // Rename the existing room if the organizer changed the name
       if (existingRoom && addRoomRenameTo.trim() && addRoomRenameTo.trim() !== existingRoom.name) {
         await fetch(`/api/events/${eventId}/rooms/${existingRoom.id}`, {
           method: 'PATCH',
@@ -321,7 +321,7 @@ export default function OperatorPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: addRoomRenameTo.trim() }),
         });
-        setOperator(prev => {
+        setOrganizer(prev => {
           if (!prev) return prev;
           return {
             ...prev,
@@ -343,7 +343,7 @@ export default function OperatorPage() {
       });
       if (res.ok) {
         const room = await res.json();
-        setOperator(prev => {
+        setOrganizer(prev => {
           if (!prev) return prev;
           return {
             ...prev,
@@ -366,7 +366,7 @@ export default function OperatorPage() {
     if (!window.confirm('Delete this room and its entire setlist?')) return;
     const res = await fetch(`/api/events/${eventId}/rooms/${roomId}`, { method: 'DELETE', credentials: 'include' });
     if (res.ok) {
-      setOperator(prev => {
+      setOrganizer(prev => {
         if (!prev) return prev;
         return {
           ...prev,
@@ -390,7 +390,7 @@ export default function OperatorPage() {
       body: JSON.stringify({ status }),
     });
     if (res.ok) {
-      setOperator(prev => {
+      setOrganizer(prev => {
         if (!prev) return prev;
         return {
           ...prev,
@@ -407,17 +407,17 @@ export default function OperatorPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) return <Layout backTo='/'><p className='text-gray-600 text-sm text-center py-12'>Loading…</p></Layout>;
-  if (notFound || !operator) return <Layout title='Not found' backTo='/'><p className='text-gray-600 text-sm text-center py-12'>Operator not found</p></Layout>;
+  if (notFound || !organizer) return <Layout title='Not found' backTo='/'><p className='text-gray-600 text-sm text-center py-12'>Organizer not found</p></Layout>;
 
-  const active = operator.events.filter(e => primaryStatus(e) === 'ACTIVE');
-  const upcoming = operator.events.filter(e => primaryStatus(e) === 'UPCOMING' || e.rooms.length === 0);
-  const closed = operator.events.filter(e => e.rooms.length > 0 && primaryStatus(e) === 'CLOSED');
+  const active = organizer.events.filter(e => primaryStatus(e) === 'ACTIVE');
+  const upcoming = organizer.events.filter(e => primaryStatus(e) === 'UPCOMING' || e.rooms.length === 0);
+  const closed = organizer.events.filter(e => e.rooms.length > 0 && primaryStatus(e) === 'CLOSED');
 
   const multiRoomValid = roomMode !== 'multi' || multiRoomNames.filter(r => r.trim()).length >= 2;
 
   function renderEvent(event: Event) {
     const status = primaryStatus(event);
-    // Single-room events navigate directly to the room for everyone (operator + public).
+    // Single-room events navigate directly to the room for everyone (organizer + public).
     // Multi-room events are not card-clickable; rooms are shown inline.
     const clickable = event.rooms.length === 1;
 
@@ -479,7 +479,7 @@ export default function OperatorPage() {
             </div>
           )}
 
-          {/* Operator view: room rows (multi-room only) + add room button */}
+          {/* Organizer view: room rows (multi-room only) + add room button */}
           {isPagePrivileged && (
             <div className='mt-3' onClick={e => e.stopPropagation()}>
               {event.rooms.length > 1 && (
@@ -554,7 +554,7 @@ export default function OperatorPage() {
 
   return (
     <>
-      <Layout title={operator.name} subtitle='Events' backTo='/'>
+      <Layout title={organizer.name} subtitle='Events' backTo='/'>
 
         {isOwner && (
           <div className='mb-8'>
@@ -753,7 +753,7 @@ export default function OperatorPage() {
           </div>
         )}
 
-        {operator.events.length === 0 ? (
+        {organizer.events.length === 0 ? (
           <p className='text-gray-600 text-sm text-center py-12'>No events yet</p>
         ) : (
           <div className='flex flex-col gap-8'>

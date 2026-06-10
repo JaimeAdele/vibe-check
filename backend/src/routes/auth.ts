@@ -102,7 +102,7 @@ router.get(
   }
 );
 
-// POST /api/auth/register-operator — Admin only, creates an Operator account
+// POST /api/auth/register-operator — Admin only, creates an Organizer account
 const SLUG_BLOCKLIST = ['admin', 'api', 'auth', 'login'];
 const SLUG_PATTERN = /^[a-z0-9-]{3,40}$/;
 
@@ -127,7 +127,7 @@ router.post('/register-operator', requireAuth, requireAdmin, async (req, res) =>
   try {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { email, name, slug, passwordHash, role: 'OPERATOR' },
+      data: { email, name, slug, passwordHash, role: 'ORGANIZER' },
     });
     res.status(201).json({ id: user.id, email: user.email, name: user.name, slug: user.slug, role: user.role });
   } catch {
