@@ -11,6 +11,7 @@ import spotifyRouter from './routes/spotify';
 import venuesRouter from './routes/venues';
 import songsRouter from './routes/songs';
 import organizersRouter from './routes/organizers';
+import usersRouter from './routes/users';
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/spotify', spotifyRouter);
 app.use('/api/venues', venuesRouter);
 app.use('/api/songs', songsRouter);
 app.use('/api/organizers', organizersRouter);
+app.use('/api/users', usersRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (_req, res) => {

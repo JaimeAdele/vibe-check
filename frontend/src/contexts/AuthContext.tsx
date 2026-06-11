@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 export interface AuthUser {
   userId: string;
   role: 'USER' | 'ORGANIZER' | 'ADMIN';
+  slug: string | null;
 }
 
 interface AuthContextType {
@@ -25,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data) setUser({ userId: data.userId, role: data.role });
+        if (data) setUser({ userId: data.userId, role: data.role, slug: data.slug ?? null });
       })
       .catch(() => {});
   }, []);
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) return null;
     const data = await res.json();
     // login endpoint returns 'id', /me returns 'userId' — normalise here
-    setUser({ userId: data.id, role: data.role });
+    setUser({ userId: data.id, role: data.role, slug: data.slug ?? null });
     return { slug: data.slug, role: data.role };
   }
 

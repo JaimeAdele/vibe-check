@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import passport from '../lib/passport';
 import prisma from '../lib/prisma';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -39,7 +39,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.passwordHash) {
     res.status(401).json({ error: 'Invalid credentials' });
     return;
@@ -67,9 +67,13 @@ const user = await prisma.user.findUnique({ where: { email } });
   res.json({ id: user.id, email: user.email, role: user.role, slug: user.slug ?? null });
 });
 
-// GET /api/auth/me - return current user's identity and role
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ userId: req.user!.userId, role: req.user!.role });
+// GET /api/auth/me - return current user's identity, role, and slug
+router.get('/me', requireAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.userId },
+    select: { slug: true },
+  });
+  res.json({ userId: req.user!.userId, role: req.user!.role, slug: user?.slug ?? null });
 });
 
 // POST /api/auth/logout
@@ -85,7 +89,7 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get(
   '/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login' }),
-  (req, res) => {
+  async (req, res) => {
     const user = req.user!;
     const token = jwt.sign(
       { userId: user.userId, role: user.role },
@@ -98,41 +102,19 @@ router.get(
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
+    if (user.role === 'ORGANIZER') {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.userId },
+        select: { slug: true },
+      });
+      if (dbUser?.slug) {
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/${dbUser.slug}`);
+        return;
+      }
+    }
     res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173');
   }
 );
-
-// POST /api/auth/register-operator — Admin only, creates an Organizer account
-const SLUG_BLOCKLIST = ['admin', 'api', 'auth', 'login'];
-const SLUG_PATTERN = /^[a-z0-9-]{3,40}$/;
-
-router.post('/register-operator', requireAuth, requireAdmin, async (req, res) => {
-  const { email, password, name, slug } = req.body;
-
-  if (!email || !password || !name || !slug) {
-    res.status(400).json({ error: 'email, password, name, and slug are required' });
-    return;
-  }
-
-  if (!SLUG_PATTERN.test(slug)) {
-    res.status(400).json({ error: 'Slug must be 3–40 characters: lowercase letters, digits, and hyphens only' });
-    return;
-  }
-
-  if (SLUG_BLOCKLIST.includes(slug)) {
-    res.status(400).json({ error: `'${slug}' is a reserved slug and cannot be used` });
-    return;
-  }
-
-  try {
-    const passwordHash = await bcrypt.hash(password, 12);
-    const user = await prisma.user.create({
-      data: { email, name, slug, passwordHash, role: 'ORGANIZER' },
-    });
-    res.status(201).json({ id: user.id, email: user.email, name: user.name, slug: user.slug, role: user.role });
-  } catch {
-    res.status(409).json({ error: 'Email or slug already in use' });
-  }
-});
 
 export default router;

@@ -11,8 +11,10 @@ interface Organizer {
   activeEventCount: number;
 }
 
-function toSlug(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+interface LookupResult {
+  id: string;
+  name: string;
+  email: string;
 }
 
 const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors text-base sm:text-sm';
@@ -26,15 +28,16 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('organizers');
   const [organizers, setOrganizers] = useState<Organizer[]>([]);
 
-  // Create form
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [slugEdited, setSlugEdited] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  // Promote flow
+  const [lookupEmail, setLookupEmail] = useState('');
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [promoteSlug, setPromoteSlug] = useState('');
+  const [showPromoteSlug, setShowPromoteSlug] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [promoteSuccess, setPromoteSuccess] = useState<string | null>(null);
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,38 +58,60 @@ export default function AdminPage() {
       .then(data => setOrganizers(data.organizers ?? []));
   }, []);
 
-  function handleNameChange(value: string) {
-    setName(value);
-    if (!slugEdited) setSlug(toSlug(value));
-  }
-
-  function handleSlugChange(value: string) {
-    setSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-    setSlugEdited(true);
-  }
-
-  async function handleCreate(e: React.FormEvent) {
+  async function handleLookup(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
-    setCreateError(null);
-    setCreateSuccess(null);
+    setLookupLoading(true);
+    setLookupResult(null);
+    setLookupError(null);
+    setShowPromoteSlug(false);
+    setPromoteSlug('');
+    setPromoteError(null);
+    setPromoteSuccess(null);
 
     try {
-      const res = await fetch('/api/auth/register-operator', {
-        method: 'POST',
+      const res = await fetch(`/api/users/lookup?email=${encodeURIComponent(lookupEmail)}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, slug }),
       });
       const data = await res.json();
-
-      if (!res.ok) { setCreateError(data.error ?? 'Something went wrong'); return; }
-
-      setCreateSuccess(`Organizer "${data.name}" created — /${data.slug}`);
-      setOrganizers(prev => [...prev, { id: data.id, name: data.name, slug: data.slug, activeEventCount: 0 }]);
-      setName(''); setSlug(''); setSlugEdited(false); setEmail(''); setPassword('');
+      if (!res.ok) { setLookupError(data.error ?? 'Something went wrong'); return; }
+      setLookupResult(data);
     } finally {
-      setCreating(false);
+      setLookupLoading(false);
+    }
+  }
+
+  function handlePromoteClick() {
+    if (!lookupResult) return;
+    const confirmed = window.confirm(
+      `Promote ${lookupResult.name} (${lookupResult.email}) to organizer?\n\nThey will have full access to create and manage events.`
+    );
+    if (confirmed) setShowPromoteSlug(true);
+  }
+
+  async function handlePromoteConfirm(e: React.FormEvent) {
+    e.preventDefault();
+    if (!lookupResult) return;
+    setPromoting(true);
+    setPromoteError(null);
+
+    try {
+      const res = await fetch(`/api/users/${lookupResult.id}/promote`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: promoteSlug }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPromoteError(data.error ?? 'Something went wrong'); return; }
+
+      setOrganizers(prev => [...prev, { id: data.id, name: data.name, slug: data.slug, activeEventCount: 0 }]);
+      setPromoteSuccess(`${data.name} has been promoted to organizer.`);
+      setLookupEmail('');
+      setLookupResult(null);
+      setShowPromoteSlug(false);
+      setPromoteSlug('');
+    } finally {
+      setPromoting(false);
     }
   }
 
@@ -157,143 +182,172 @@ export default function AdminPage() {
       {tab === 'venues' && <AdminVenuesPanel />}
 
       {tab === 'organizers' && <>
-      {/* Create organizer form */}
-      <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8'>
-        <h2 className='text-white font-semibold mb-4'>Create organizer account</h2>
-        <form onSubmit={handleCreate} className='flex flex-col gap-3'>
-          <input
-            value={name}
-            onChange={e => handleNameChange(e.target.value)}
-            placeholder='Display name'
-            className={inputClass}
-          />
-          <div>
-            <input
-              value={slug}
-              onChange={e => handleSlugChange(e.target.value)}
-              placeholder='URL slug'
-              className={inputClass}
-            />
-            <p className='text-xs text-gray-600 mt-1 pl-1'>
-              /{slug || 'slug'} · lowercase letters, digits, hyphens · 3–40 chars
-            </p>
-          </div>
-          <input
-            type='email'
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder='Email'
-            className={inputClass}
-          />
-          <input
-            type='password'
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder='Password'
-            className={inputClass}
-          />
-          <button
-            type='submit'
-            disabled={!name.trim() || !slug.trim() || !email.trim() || !password.trim() || creating}
-            className='w-full bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm cursor-pointer'
-          >
-            {creating ? 'Creating…' : 'Create organizer'}
-          </button>
-          {createError && <p className='text-red-400 text-sm'>{createError}</p>}
-          {createSuccess && <p className='text-green-400 text-sm'>{createSuccess}</p>}
-        </form>
-      </div>
 
-      {/* Organizer list */}
-      <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4'>
-        All organizers
-      </h2>
-      {organizers.length === 0 ? (
-        <p className='text-gray-600 text-sm text-center py-8'>No organizers yet</p>
-      ) : (
-        <ul className='flex flex-col gap-3'>
-          {organizers.map(org => (
-            <li key={org.id}>
-              {editingId === org.id ? (
-                /* Edit form */
-                <div className='bg-gray-900 border border-accent/40 rounded-xl px-5 py-4'>
-                  <div className='flex flex-col gap-3'>
-                    <input
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      placeholder='Display name'
-                      className={inputClass}
-                    />
-                    <div>
+        {/* Promote user to organizer */}
+        <div className='bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8'>
+          <h2 className='text-white font-semibold mb-1'>Promote user to organizer</h2>
+          <p className='text-xs text-gray-500 mb-4'>The user must have signed in with Google at least once to have an account.</p>
+
+          <form onSubmit={handleLookup} className='flex gap-2 mb-3'>
+            <input
+              type='email'
+              value={lookupEmail}
+              onChange={e => { setLookupEmail(e.target.value); setLookupResult(null); setLookupError(null); setShowPromoteSlug(false); setPromoteSuccess(null); }}
+              placeholder='User email address'
+              className={inputClass + ' flex-1'}
+            />
+            <button
+              type='submit'
+              disabled={!lookupEmail.trim() || lookupLoading}
+              className='bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-4 py-3 rounded-xl transition-colors text-sm cursor-pointer shrink-0'
+            >
+              {lookupLoading ? 'Finding…' : 'Find'}
+            </button>
+          </form>
+
+          {lookupError && <p className='text-red-400 text-sm mb-3'>{lookupError}</p>}
+          {promoteSuccess && <p className='text-green-400 text-sm mb-3'>{promoteSuccess}</p>}
+
+          {lookupResult && !showPromoteSlug && (
+            <div className='flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3'>
+              <div>
+                <p className='text-white text-sm font-medium'>{lookupResult.name}</p>
+                <p className='text-gray-500 text-xs'>{lookupResult.email}</p>
+              </div>
+              <button
+                onClick={handlePromoteClick}
+                className='text-xs font-medium text-green-400 hover:text-green-300 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ml-3'
+              >
+                Promote
+              </button>
+            </div>
+          )}
+
+          {showPromoteSlug && lookupResult && (
+            <form onSubmit={handlePromoteConfirm} className='flex flex-col gap-3'>
+              <div>
+                <input
+                  value={promoteSlug}
+                  onChange={e => setPromoteSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder='URL slug (e.g. my-collective)'
+                  autoFocus
+                  className={inputClass}
+                />
+                <p className='text-xs text-gray-600 mt-1 pl-1'>
+                  /{promoteSlug || 'slug'} · lowercase letters, digits, hyphens · 3–40 chars
+                </p>
+              </div>
+              {promoteError && <p className='text-red-400 text-sm'>{promoteError}</p>}
+              <div className='flex gap-2'>
+                <button
+                  type='submit'
+                  disabled={!promoteSlug.trim() || promoting}
+                  className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
+                >
+                  {promoting ? 'Promoting…' : 'Confirm promotion'}
+                </button>
+                <button
+                  type='button'
+                  onClick={() => { setShowPromoteSlug(false); setPromoteError(null); }}
+                  className='flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Organizer list */}
+        <h2 className='text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4'>
+          All organizers
+        </h2>
+        {organizers.length === 0 ? (
+          <p className='text-gray-600 text-sm text-center py-8'>No organizers yet</p>
+        ) : (
+          <ul className='flex flex-col gap-3'>
+            {organizers.map(org => (
+              <li key={org.id}>
+                {editingId === org.id ? (
+                  /* Edit form */
+                  <div className='bg-gray-900 border border-accent/40 rounded-xl px-5 py-4'>
+                    <div className='flex flex-col gap-3'>
                       <input
-                        value={editSlug}
-                        onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                        placeholder='URL slug'
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        placeholder='Display name'
                         className={inputClass}
                       />
-                      <p className='text-xs text-gray-600 mt-1 pl-1'>/{editSlug || 'slug'}</p>
-                    </div>
-                    <input
-                      type='email'
-                      value={editEmail}
-                      onChange={e => setEditEmail(e.target.value)}
-                      placeholder='New email (leave blank to keep current)'
-                      className={inputClass}
-                    />
-                    <input
-                      type='password'
-                      value={editPassword}
-                      onChange={e => setEditPassword(e.target.value)}
-                      placeholder='New password (leave blank to keep current)'
-                      className={inputClass}
-                    />
-                    {editError && <p className='text-red-400 text-sm'>{editError}</p>}
-                    <div className='flex gap-2'>
-                      <button
-                        onClick={() => handleSave(org)}
-                        disabled={saving || !editName.trim() || !editSlug.trim()}
-                        className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
-                      >
-                        {saving ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className='flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
-                      >
-                        Cancel
-                      </button>
+                      <div>
+                        <input
+                          value={editSlug}
+                          onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                          placeholder='URL slug'
+                          className={inputClass}
+                        />
+                        <p className='text-xs text-gray-600 mt-1 pl-1'>/{editSlug || 'slug'}</p>
+                      </div>
+                      <input
+                        type='email'
+                        value={editEmail}
+                        onChange={e => setEditEmail(e.target.value)}
+                        placeholder='New email (leave blank to keep current)'
+                        className={inputClass}
+                      />
+                      <input
+                        type='password'
+                        value={editPassword}
+                        onChange={e => setEditPassword(e.target.value)}
+                        placeholder='New password (leave blank to keep current)'
+                        className={inputClass}
+                      />
+                      {editError && <p className='text-red-400 text-sm'>{editError}</p>}
+                      <div className='flex gap-2'>
+                        <button
+                          onClick={() => handleSave(org)}
+                          disabled={saving || !editName.trim() || !editSlug.trim()}
+                          className='flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
+                        >
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className='flex-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-semibold py-2.5 rounded-xl transition-colors text-sm cursor-pointer'
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                /* Organizer card */
-                <div className='flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-5 py-4'>
-                  <button
-                    onClick={() => navigate(`/${org.slug}`)}
-                    className='flex-1 text-left'
-                  >
-                    <p className='text-white font-medium'>{org.name}</p>
-                    <p className='text-gray-500 text-xs mt-0.5'>/{org.slug}</p>
-                  </button>
-                  <div className='flex items-center gap-2 shrink-0 ml-3'>
-                    {org.activeEventCount > 0 && (
-                      <span className='text-xs font-medium bg-green-500/15 text-green-400 px-2.5 py-1 rounded-full'>
-                        {org.activeEventCount} {org.activeEventCount === 1 ? 'event' : 'events'}
-                      </span>
-                    )}
+                ) : (
+                  /* Organizer card */
+                  <div className='flex items-center justify-between bg-gray-900 border border-gray-800 rounded-xl px-5 py-4'>
                     <button
-                      onClick={() => startEdit(org)}
-                      className='text-xs text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer'
+                      onClick={() => navigate(`/${org.slug}`)}
+                      className='flex-1 text-left'
                     >
-                      Edit
+                      <p className='text-white font-medium'>{org.name}</p>
+                      <p className='text-gray-500 text-xs mt-0.5'>/{org.slug}</p>
                     </button>
+                    <div className='flex items-center gap-2 shrink-0 ml-3'>
+                      {org.activeEventCount > 0 && (
+                        <span className='text-xs font-medium bg-green-500/15 text-green-400 px-2.5 py-1 rounded-full'>
+                          {org.activeEventCount} {org.activeEventCount === 1 ? 'event' : 'events'}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => startEdit(org)}
+                        className='text-xs text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer'
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </>}
 
     </Layout>

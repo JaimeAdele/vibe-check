@@ -7,26 +7,28 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      callbackURL: '/api/auth/google/callback'
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback'
     },
     async (_accessToken, _refreshToken, profile, done) => {
       try {
         const email = profile.emails?.[0].value;
         if (!email) return done(new Error('No email from Google'));
 
-        let user = await prisma.user.findUnique({
-          where: { googleId: profile.id }
-        });
+        let user = await prisma.user.findUnique({ where: { googleId: profile.id } });
 
         if (!user) {
-          user = await prisma.user.create({
-            data: {
-              email,
-              name: profile.displayName,
-              googleId: profile.id,
-              role: 'USER'
-            }
-          });
+          const existingByEmail = await prisma.user.findUnique({ where: { email } });
+          if (existingByEmail) {
+            // Link Google identity to the existing account
+            user = await prisma.user.update({
+              where: { email },
+              data: { googleId: profile.id },
+            });
+          } else {
+            user = await prisma.user.create({
+              data: { email, name: profile.displayName, googleId: profile.id, role: 'USER' },
+            });
+          }
         }
 
         return done(null, { userId: user.id, role: user.role });

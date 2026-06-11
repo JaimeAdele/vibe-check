@@ -172,8 +172,9 @@ All routes are prefixed with `/api`.
 | `POST` | `/auth/login` | — | Email/password login — returns a JWT cookie |
 | `GET` | `/auth/me` | cookie | Get current user |
 | `POST` | `/auth/logout` | — | Clear session cookie |
-| `GET` | `/auth/google` | — | Initiate Google OAuth |
-| `POST` | `/auth/register-operator` | Admin | Create an Organizer account with slug |
+| `GET` | `/auth/google` | — | Initiate Google OAuth (creates USER account on first sign-in; links to existing account if email matches) |
+| `GET` | `/users/lookup?email=...` | Admin | Find a USER-role account by email |
+| `PATCH` | `/users/:id/promote` | Admin | Promote a user to Organizer and assign their slug |
 | `GET` | `/organizers` | — | List all organizers with active event counts |
 | `GET` | `/organizers/:slug` | — | Organizer profile + events + rooms |
 | `PATCH` | `/organizers/:id` | Admin | Edit organizer name or slug |
@@ -192,8 +193,8 @@ All routes are prefixed with `/api`.
 | `DELETE` | `/rooms/:roomCode/identify/lock` | — | Release identification lock |
 | `POST` | `/rooms/:roomCode/identify` | — | Submit audio for song identification |
 | `GET` | `/venues` | — | List active venues |
-| `GET` | `/venues/all` | Operator/Admin | All venues including inactive |
-| `POST` | `/venues` | Operator/Admin | Create a venue (stores createdById) |
+| `GET` | `/venues/all` | Organizer/Admin | All venues including inactive |
+| `POST` | `/venues` | Organizer/Admin | Create a venue (stores createdById) |
 | `POST` | `/venues/validate-location/:roomCode` | — | Check coordinates against room's venue geofence |
 | `PATCH` | `/venues/:id` | Creator/Admin | Edit venue fields |
 | `DELETE` | `/venues/:id` | Creator/Admin | Soft-delete a venue |

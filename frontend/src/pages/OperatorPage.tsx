@@ -102,6 +102,12 @@ function describeRecurrence(freq: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY', date: Date,
   return `The ${posLabel} ${dayName} of each month`;
 }
 
+function defaultEventTime(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T21:00`;
+}
+
 function primaryStatus(event: Event): 'ACTIVE' | 'UPCOMING' | 'CLOSED' {
   if (event.rooms.some(r => r.status === 'ACTIVE')) return 'ACTIVE';
   if (event.rooms.some(r => r.status === 'UPCOMING')) return 'UPCOMING';
@@ -409,8 +415,9 @@ export default function OperatorPage() {
   if (loading) return <Layout backTo='/'><p className='text-gray-600 text-sm text-center py-12'>Loading…</p></Layout>;
   if (notFound || !organizer) return <Layout title='Not found' backTo='/'><p className='text-gray-600 text-sm text-center py-12'>Organizer not found</p></Layout>;
 
-  const active = organizer.events.filter(e => primaryStatus(e) === 'ACTIVE');
-  const upcoming = organizer.events.filter(e => primaryStatus(e) === 'UPCOMING' || e.rooms.length === 0);
+  const byStartAsc = (a: Event, b: Event) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  const active = organizer.events.filter(e => primaryStatus(e) === 'ACTIVE').sort(byStartAsc);
+  const upcoming = organizer.events.filter(e => primaryStatus(e) === 'UPCOMING' || e.rooms.length === 0).sort(byStartAsc);
   const closed = organizer.events.filter(e => e.rooms.length > 0 && primaryStatus(e) === 'CLOSED');
 
   const multiRoomValid = roomMode !== 'multi' || multiRoomNames.filter(r => r.trim()).length >= 2;
@@ -572,6 +579,7 @@ export default function OperatorPage() {
                   type='datetime-local'
                   value={newEventTime}
                   onChange={e => setNewEventTime(e.target.value)}
+                  step='900'
                   className={inputClass}
                 />
 
@@ -744,7 +752,7 @@ export default function OperatorPage() {
               </form>
             ) : (
               <button
-                onClick={() => setShowCreateEvent(true)}
+                onClick={() => { setNewEventTime(defaultEventTime()); setShowCreateEvent(true); }}
                 className='w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-gray-400 hover:text-white text-sm font-medium py-3 rounded-xl transition-colors cursor-pointer'
               >
                 + New event
